@@ -9,8 +9,7 @@ import logger from '../utils/logger';
 import { TaskRequest } from '../types/comment';
 import { FileUploadRequest } from '../types/file';
 import { CustomRequest } from '../types/express';
-
-const UPLOADS_DIR = path.resolve(__dirname, '../../uploads');
+import { UPLOADS_DIR } from '../utils/uploadsDir';
 
 // Get task files
 export const getTaskFiles = async (
