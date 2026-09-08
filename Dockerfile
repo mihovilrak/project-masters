@@ -43,7 +43,6 @@ RUN mkdir node_modules && \
     yarn config set cache-folder /tmp/yarn-cache && \
     yarn install --frozen-lockfile --prefer-offline \
     --production=false && \
-    yarn add -D typescript @types/node && \
     yarn cache clean --all
 
 # Copy source code
@@ -73,7 +72,6 @@ RUN mkdir node_modules && \
     yarn config set cache-folder /tmp/yarn-cache && \
     yarn install --frozen-lockfile --prefer-offline \
     --production=false --link-duplicates --ignore-optional && \
-    yarn add -D typescript @types/node && \
     npm install -g @vercel/ncc && \
     yarn cache clean --all
 
