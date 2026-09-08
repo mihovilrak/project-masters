@@ -8,11 +8,8 @@ WORKDIR /app/fe
 COPY fe/package*.json fe/yarn.lock fe/tsconfig.json fe/.yarnrc fe/config-overrides.js ./
 
 # Install dependencies
-RUN mkdir node_modules && \
-    yarn config set cache-folder /tmp/yarn-cache && \
-    (yarn install --frozen-lockfile --prefer-offline --production=false || \
-     yarn install --prefer-offline --production=false) && \
-    yarn add -D @babel/plugin-proposal-private-property-in-object react-app-rewired && \
+RUN yarn config set cache-folder /tmp/yarn-cache && \
+    yarn install --frozen-lockfile --prefer-offline --production=false && \
     yarn cache clean --all
 
 # Copy source code
@@ -106,7 +103,7 @@ RUN apk add --no-cache \
     npm \
     postgresql-client && \
     chmod +x /start-app.sh && \
-    mkdir -p api service db-init uploads /backups /app/crontabs && \
+    mkdir -p api service db-init uploads config /backups /app/crontabs && \
     chmod +x /usr/local/bin/backup.sh && \
     chmod +x /app/seed-admin.sh && \
     chmod 0600 /app/crontabs/nginx && \
@@ -124,8 +121,12 @@ COPY --from=notification-builder /app/service/dist/templates/ ./service/template
 # Copy NGINX configuration
 COPY fe/nginx.conf /etc/nginx/nginx.conf
 
-# Expose ports
-EXPOSE 8080 5000
+# Both are volume-backed: the rest of the filesystem is read-only at runtime.
+ENV UPLOADS_DIR=/app/uploads
+ENV ENV_FILE_PATH=/app/config/.env
+
+# 8080 nginx, 5000 api, 5001 notification service
+EXPOSE 8080 5000 5001
 
 USER nginx
 
