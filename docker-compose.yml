@@ -66,10 +66,13 @@ services:
       NOTIFICATION_RATE_LIMIT: ${NOTIFICATION_RATE_LIMIT}
       NOTIFICATION_API_KEY: ${NOTIFICATION_API_KEY}
       LOG_LEVEL: ${LOG_LEVEL}
+      UPLOADS_DIR: /app/uploads
+      ENV_FILE_PATH: /app/config/.env
     ports:
       - "3000:8080"
     volumes:
       - app_uploads:/app/uploads
+      - app_config:/app/config
       - ./db/backup:/backups
     tmpfs:
       - /tmp:mode=1777
@@ -94,4 +97,5 @@ networks:
 
 volumes:
   app_uploads:
+  app_config:
   db_data:
