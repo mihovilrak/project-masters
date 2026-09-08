@@ -12,3 +12,4 @@ db/backup/
 .cursorrules
 mcp-test-server/
 scripts/
+api/uploads/

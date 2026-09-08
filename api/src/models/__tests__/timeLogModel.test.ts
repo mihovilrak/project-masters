@@ -22,6 +22,7 @@ describe('TimeLogModel', () => {
 
       expect(mockPool.query).toHaveBeenCalledWith(
         expect.stringContaining('get_time_logs'),
+        [500, 0],
       );
       expect(result).toEqual(mockTimeLogs);
     });
@@ -69,6 +70,52 @@ describe('TimeLogModel', () => {
       });
 
       expect(result).toEqual(mockTimeLog);
+    });
+
+    it('should only write the keys present in the payload', async () => {
+      const mockTimeLog = { id: '1', spent_time: 5.0 };
+      (mockPool.query as jest.Mock).mockResolvedValue({
+        rows: [mockTimeLog],
+      } as QueryResult);
+
+      const result = await timeLogModel.updateTimeLog(mockPool, '1', {
+        spent_time: 5.0,
+      });
+
+      const [sql, values] = (mockPool.query as jest.Mock).mock.calls[0];
+      expect(sql).toContain('spent_time = $1');
+      expect(sql).not.toContain('description =');
+      expect(sql).not.toContain('log_date =');
+      expect(sql).not.toContain('activity_type_id =');
+      expect(values).toEqual([5.0, '1']);
+      expect(result).toEqual(mockTimeLog);
+    });
+
+    it('should read the row back when no updatable key is provided', async () => {
+      const mockTimeLog = { id: '1', spent_time: 3.0 };
+      (mockPool.query as jest.Mock).mockResolvedValue({
+        rows: [mockTimeLog],
+      } as QueryResult);
+
+      const result = await timeLogModel.updateTimeLog(mockPool, '1', {});
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        'SELECT * FROM time_logs WHERE id = $1',
+        ['1'],
+      );
+      expect(result).toEqual(mockTimeLog);
+    });
+
+    it('should return null when the time log does not exist', async () => {
+      (mockPool.query as jest.Mock).mockResolvedValue({
+        rows: [],
+      } as unknown as QueryResult);
+
+      const result = await timeLogModel.updateTimeLog(mockPool, '99', {
+        spent_time: 1,
+      });
+
+      expect(result).toBeNull();
     });
   });
 

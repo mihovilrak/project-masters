@@ -18,7 +18,7 @@ export const session = async (
       );
       res.status(200).json({ user: req.session.user, permissions });
     } else {
-      res.status(401).json({ message: 'Not authenticated' });
+      res.status(401).json({ error: 'Not authenticated' });
     }
   } catch (error) {
     logger.error({ err: error });

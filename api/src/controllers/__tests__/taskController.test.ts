@@ -16,9 +16,7 @@ import { Session } from 'express-session';
 jest.mock('../../models/taskModel');
 jest.mock('../../models/notificationModel');
 jest.mock('../../models/accessModel', () => ({
-  filterByProjectAccess: jest.fn(
-    async (_pool: unknown, _userId: string, rows: unknown[]) => rows,
-  ),
+  resolveProjectScope: jest.fn(async (_pool: unknown, userId: string) => userId),
 }));
 
 describe('TaskController', () => {
@@ -98,7 +96,12 @@ describe('TaskController', () => {
         mockPool as Pool,
       );
 
-      expect(taskModel.getTasks).toHaveBeenCalledWith(mockPool, undefined);
+      expect(taskModel.getTasks).toHaveBeenCalledWith(
+        mockPool,
+        undefined,
+        { limit: 500, offset: 0 },
+        '1',
+      );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith([mockTask]);
     });
@@ -135,6 +138,8 @@ describe('TaskController', () => {
       expect(taskModel.getTasksByProject).toHaveBeenCalledWith(
         mockPool,
         projectId,
+        { limit: 500, offset: 0 },
+        '1',
       );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(mockTasks);
@@ -169,9 +174,12 @@ describe('TaskController', () => {
         mockPool as Pool,
       );
 
-      expect(taskModel.getTasks).toHaveBeenCalledWith(mockPool, {
-        assignee_id: Number(assigneeId),
-      });
+      expect(taskModel.getTasks).toHaveBeenCalledWith(
+        mockPool,
+        { assignee_id: Number(assigneeId) },
+        { limit: 500, offset: 0 },
+        '1',
+      );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(mockTasks);
     });
@@ -205,9 +213,12 @@ describe('TaskController', () => {
         mockPool as Pool,
       );
 
-      expect(taskModel.getTasks).toHaveBeenCalledWith(mockPool, {
-        holder_id: Number(holderId),
-      });
+      expect(taskModel.getTasks).toHaveBeenCalledWith(
+        mockPool,
+        { holder_id: Number(holderId) },
+        { limit: 500, offset: 0 },
+        '1',
+      );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(mockTasks);
     });
@@ -226,6 +237,8 @@ describe('TaskController', () => {
       expect(taskModel.getTasks).toHaveBeenCalledWith(
         mockPool,
         expect.objectContaining({ status_id: [1, 2] }),
+        { limit: 500, offset: 0 },
+        '1',
       );
       expect(mockRes.status).toHaveBeenCalledWith(200);
     });
@@ -240,7 +253,12 @@ describe('TaskController', () => {
         mockPool as Pool,
       );
 
-      expect(taskModel.getTasks).toHaveBeenCalledWith(mockPool, undefined);
+      expect(taskModel.getTasks).toHaveBeenCalledWith(
+        mockPool,
+        undefined,
+        { limit: 500, offset: 0 },
+        '1',
+      );
       expect(mockRes.status).toHaveBeenCalledWith(200);
     });
 
@@ -360,7 +378,7 @@ describe('TaskController', () => {
 
       expect(mockRes.status).toHaveBeenCalledWith(404);
       expect(mockRes.json).toHaveBeenCalledWith({
-        message: 'No tasks assigned',
+        error: 'No tasks assigned',
       });
     });
   });
@@ -414,7 +432,7 @@ describe('TaskController', () => {
 
       expect(mockRes.status).toHaveBeenCalledWith(404);
       expect(mockRes.json).toHaveBeenCalledWith({
-        message: 'No tasks assigned',
+        error: 'No tasks assigned',
       });
     });
   });

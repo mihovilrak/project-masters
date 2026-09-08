@@ -1,5 +1,13 @@
 import { Pool } from 'pg';
-import { ActivityType } from '../types/activityType';
+import { ActivityType, ActivityTypeUpdateInput } from '../types/activityType';
+import { buildUpdateAssignments } from '../utils/sqlUpdate';
+
+export const ALLOWED_ACTIVITY_TYPE_UPDATE_KEYS = [
+  'name',
+  'description',
+  'color',
+  'icon',
+] as const;
 
 // Activity Type Model
 export const getActivityTypes = async (pool: Pool): Promise<ActivityType[]> => {
@@ -33,17 +41,26 @@ export const createActivityType = async (
 export const updateActivityType = async (
   pool: Pool,
   id: string,
-  name: string,
-  description: string | null,
-  color: string,
-  icon: string | null,
+  updates: ActivityTypeUpdateInput,
 ): Promise<ActivityType | null> => {
+  const assignments = buildUpdateAssignments(
+    updates as Record<string, unknown>,
+    ALLOWED_ACTIVITY_TYPE_UPDATE_KEYS,
+  );
+  if (!assignments) {
+    const current = await pool.query(
+      `SELECT * FROM activity_types WHERE id = $1 AND active = true`,
+      [id],
+    );
+    return current.rows[0] || null;
+  }
+
   const result = await pool.query(
     `UPDATE activity_types
-    SET (name, description, color, icon, updated_on) = ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-    WHERE id = $5 AND active = true
+    SET ${assignments.setClause}, updated_on = CURRENT_TIMESTAMP
+    WHERE id = $${assignments.nextIndex} AND active = true
     RETURNING *`,
-    [name, description, color, icon, id],
+    [...assignments.values, id],
   );
   return result.rows[0] || null;
 };

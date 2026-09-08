@@ -22,7 +22,11 @@ export default (pool: Pool): Router => {
   );
   router.use('/task-types', taskTypeRouter.default(pool));
   router.use('/activity-types', activityTypeRouter.default(pool));
-  router.get('/permissions', withPool(pool, adminController.getAllPermissions));
+  router.get(
+    '/permissions',
+    checkPermission(pool, 'Admin'),
+    withPool(pool, adminController.getAllPermissions),
+  );
 
   return router;
 };

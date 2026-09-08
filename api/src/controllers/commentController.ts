@@ -74,6 +74,9 @@ export const editComment = async (
 
   try {
     const editedComment = await commentModel.editComment(pool, id, comment);
+    if (!editedComment) {
+      return res.status(404).json({ error: 'Comment not found' });
+    }
     res.status(200).json(editedComment);
   } catch (error) {
     logger.error({ err: error });

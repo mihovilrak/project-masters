@@ -8,11 +8,21 @@ import {
   ProjectTask,
 } from '../types/project';
 import { Pool, QueryResult } from 'pg';
+import { Queryable } from '../utils/transaction';
+import { buildUpdateAssignments } from '../utils/sqlUpdate';
+import { accessibleProjectsSubquery } from './accessModel';
+import {
+  Pagination,
+  defaultPagination,
+  paginationClause,
+} from '../utils/pagination';
 
 // Get all projects (with status_name, created_by_name, estimated_time, spent_time, progress from project_details)
 export const getProjects = async (
   pool: Pool,
   filters: ProjectFilters = {},
+  pagination: Pagination = defaultPagination(),
+  scopeUserId?: string | null,
 ): Promise<Project[]> => {
   const values: unknown[] = [];
   const conditions: string[] = [];
@@ -31,14 +41,25 @@ export const getProjects = async (
   addCondition('p.due_date >=', filters.dueDateFrom);
   addCondition('p.due_date <=', filters.dueDateTo);
 
+  if (scopeUserId != null) {
+    values.push(scopeUserId);
+    conditions.push(`p.id IN (${accessibleProjectsSubquery(values.length)})`);
+  }
+
   const whereClause =
     conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+  const page = paginationClause(pagination, values.length + 1);
   const query = `SELECT p.id, p.name, p.description, p.start_date, p.end_date, p.due_date, p.parent_id, p.status_id, p.created_by, p.created_on, p.updated_on,
     pd.status_name, pd.created_by_name, pd.estimated_time, pd.spent_time, pd.progress
 FROM projects p
-LEFT JOIN LATERAL (SELECT status_name, created_by_name, estimated_time, spent_time, progress FROM project_details(p.id)) pd ON true${whereClause}`;
+LEFT JOIN LATERAL (SELECT status_name, created_by_name, estimated_time, spent_time, progress FROM project_details(p.id)) pd ON true${whereClause}
+ORDER BY p.id
+${page.clause}`;
 
-  const result: QueryResult<Project> = await pool.query(query, values);
+  const result: QueryResult<Project> = await pool.query(query, [
+    ...values,
+    ...page.values,
+  ]);
   return result.rows;
 };
 
@@ -101,7 +122,7 @@ export const changeProjectStatus = async (
   return result.rows[0] || null;
 };
 
-const ALLOWED_PROJECT_UPDATE_KEYS = [
+export const ALLOWED_PROJECT_UPDATE_KEYS = [
   'name',
   'description',
   'start_date',
@@ -116,25 +137,20 @@ export const updateProject = async (
   updates: Partial<Project>,
   id: string,
 ): Promise<number | null> => {
-  const filteredEntries = Object.entries(updates).filter(([key]) =>
-    ALLOWED_PROJECT_UPDATE_KEYS.includes(
-      key as (typeof ALLOWED_PROJECT_UPDATE_KEYS)[number],
-    ),
+  const assignments = buildUpdateAssignments(
+    updates as Record<string, unknown>,
+    ALLOWED_PROJECT_UPDATE_KEYS,
   );
-  if (filteredEntries.length === 0) {
+  if (!assignments) {
     return null;
   }
-  const columns = filteredEntries.map(([k]) => k);
-  const values = filteredEntries.map(([, v]) => v);
 
-  let query = `UPDATE projects SET (${columns.join(', ')}) =
-  (${columns.map((_, index) => `$${index + 1}`).join(', ')})`;
-
-  query += ` WHERE id = $${columns.length + 1}`;
-
-  values.push(id);
-
-  const result: QueryResult = await pool.query(query, values);
+  const result: QueryResult = await pool.query(
+    `UPDATE projects
+    SET ${assignments.setClause}
+    WHERE id = $${assignments.nextIndex}`,
+    [...assignments.values, id],
+  );
   return result.rowCount;
 };
 
@@ -154,10 +170,14 @@ export const deleteProject = async (
 export const getProjectMembers = async (
   pool: Pool,
   projectId: string,
+  pagination: Pagination = defaultPagination(),
 ): Promise<ProjectMember[]> => {
+  const page = paginationClause(pagination, 2);
   const result: QueryResult<ProjectMember> = await pool.query(
-    'SELECT * FROM get_project_members($1)',
-    [projectId],
+    `SELECT * FROM get_project_members($1)
+     ORDER BY user_id
+     ${page.clause}`,
+    [projectId, ...page.values],
   );
   return result.rows;
 };
@@ -166,17 +186,21 @@ export const getProjectMembers = async (
 export const getSubprojects = async (
   pool: Pool,
   parentId: string,
+  pagination: Pagination = defaultPagination(),
 ): Promise<Project[]> => {
+  const page = paginationClause(pagination, 2);
   const result: QueryResult<Project> = await pool.query(
-    'SELECT * FROM get_subprojects($1)',
-    [parentId],
+    `SELECT * FROM get_subprojects($1)
+     ORDER BY id
+     ${page.clause}`,
+    [parentId, ...page.values],
   );
   return result.rows;
 };
 
 // Add project member
 export const addProjectMember = async (
-  pool: Pool,
+  pool: Queryable,
   projectId: string,
   userId: string,
 ): Promise<ProjectMember | null> => {
@@ -216,6 +240,7 @@ export const getProjectTasks = async (
   pool: Pool,
   id: string,
   filters: ProjectTaskFilters = {},
+  pagination: Pagination = defaultPagination(),
 ): Promise<ProjectTask[]> => {
   const projectId = id != null && id !== '' ? String(id).trim() : null;
   if (!projectId) {
@@ -233,14 +258,16 @@ export const getProjectTasks = async (
   const assignee_id =
     rawAssignee != null && !Number.isNaN(rawAssignee) ? rawAssignee : null;
 
+  const page = paginationClause(pagination, 5);
   const result: QueryResult<ProjectTask> = await pool.query(
     `SELECT * FROM get_tasks(
       null, $1, $2, null, $3, $4, null, null, false,
       null, null, null, null, null, null, null, null, null, false,
       null, null, null, null, null, null, null
     )
-    ORDER BY created_on DESC`,
-    [projectId, assignee_id, status_id, priority_id],
+    ORDER BY created_on DESC, id DESC
+    ${page.clause}`,
+    [projectId, assignee_id, status_id, priority_id, ...page.values],
   );
   return result.rows;
 };

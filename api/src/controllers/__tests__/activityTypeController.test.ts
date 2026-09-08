@@ -229,15 +229,10 @@ describe('ActivityTypeController', () => {
         mockPool as Pool,
       );
 
-      // Controller calls updateActivityType with individual parameters:
-      // id, name, description, color, icon
       expect(activityTypeModel.updateActivityType).toHaveBeenCalledWith(
         mockPool,
         activityTypeId,
-        mockUpdateData.name,
-        '', // description defaults to ''
-        '', // color defaults to ''
-        '', // icon defaults to ''
+        { name: mockUpdateData.name },
       );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(updatedActivityType);
@@ -275,6 +270,26 @@ describe('ActivityTypeController', () => {
         error: 'Invalid color format',
       });
       expect(activityTypeModel.updateActivityType).not.toHaveBeenCalled();
+    });
+
+    it('should not forward fields the request body omitted', async () => {
+      mockReq.params = { id: '1' };
+      mockReq.body = { color: '#00FF00' };
+      (activityTypeModel.updateActivityType as jest.Mock).mockResolvedValue({
+        id: 1,
+      });
+
+      await activityTypeController.updateActivityType(
+        mockReq as Request,
+        mockRes as Response,
+        mockPool as Pool,
+      );
+
+      expect(activityTypeModel.updateActivityType).toHaveBeenCalledWith(
+        mockPool,
+        '1',
+        { color: '#00FF00' },
+      );
     });
   });
 

@@ -65,21 +65,30 @@ export const updateActivityType = async (
 ): Promise<Response | void> => {
   try {
     const { id } = req.params;
-    const { name, description, color, icon } =
-      req.body as ActivityTypeUpdateInput;
+    const body = (req.body ?? {}) as ActivityTypeUpdateInput;
 
     // Validate color format when provided (must be hex #RRGGBB for DB varchar(7))
-    if (color != null && color !== '' && !color.match(/^#[0-9A-Fa-f]{6}$/)) {
+    if (
+      body.color != null &&
+      body.color !== '' &&
+      !body.color.match(/^#[0-9A-Fa-f]{6}$/)
+    ) {
       return res.status(400).json({ error: 'Invalid color format' });
+    }
+
+    // Only forward the keys the client actually sent so a partial update never
+    // blanks the fields it left out.
+    const updates: ActivityTypeUpdateInput = {};
+    for (const key of ['name', 'description', 'color', 'icon'] as const) {
+      if (body[key] !== undefined) {
+        updates[key] = body[key];
+      }
     }
 
     const activityType = await activityTypeModel.updateActivityType(
       pool,
       id || '',
-      name || '',
-      description || '',
-      color || '',
-      icon || '',
+      updates,
     );
 
     if (!activityType) {

@@ -6,18 +6,28 @@ import {
   NotificationCreateInput,
   CreateWatcherNotificationsInput,
 } from '../types/notification';
+import {
+  Pagination,
+  defaultPagination,
+  paginationClause,
+} from '../utils/pagination';
 
 // Get notifications by user ID
 export const getNotificationsByUserId = async (
   pool: Pool,
   user_id: string,
+  pagination: Pagination = defaultPagination(),
 ): Promise<NotificationWithDetails[]> => {
   // user_notifications() applies the soft-delete predicate and joins the type
   // name/icon/colour the client renders; querying the table directly returned
   // notifications the user had already dismissed.
-  const result = await pool.query('SELECT * FROM user_notifications($1)', [
-    user_id,
-  ]);
+  const page = paginationClause(pagination, 2);
+  const result = await pool.query(
+    `SELECT * FROM user_notifications($1)
+     ORDER BY created_on DESC, id DESC
+     ${page.clause}`,
+    [user_id, ...page.values],
+  );
   return result.rows;
 };
 
@@ -88,7 +98,7 @@ export const createWatcherNotifications = async (
 
 // Create project member notifications
 export const createProjectMemberNotifications = async (
-  pool: Pool,
+  pool: Queryable,
   {
     project_id,
     action_user_id,

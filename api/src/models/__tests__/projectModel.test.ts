@@ -37,7 +37,7 @@ describe('ProjectModel', () => {
       expect(query).toContain('project_details(p.id)');
       expect(query).toContain('status_name');
       expect(query).toContain('created_by_name');
-      expect((mockPool.query as jest.Mock).mock.calls[0][1]).toEqual([]);
+      expect((mockPool.query as jest.Mock).mock.calls[0][1]).toEqual([500, 0]);
       expect(result).toEqual(mockProjects);
     });
 
@@ -51,7 +51,7 @@ describe('ProjectModel', () => {
 
       const query = (mockPool.query as jest.Mock).mock.calls[0][0];
       expect(query).toContain('p.status_id = $1');
-      expect((mockPool.query as jest.Mock).mock.calls[0][1]).toEqual([1]);
+      expect((mockPool.query as jest.Mock).mock.calls[0][1]).toEqual([1, 500, 0]);
       expect(result).toEqual(mockProjects);
     });
 
@@ -68,8 +68,30 @@ describe('ProjectModel', () => {
 
       const query = (mockPool.query as jest.Mock).mock.calls[0][0];
       expect(query).toContain('p.status_id = $1');
-      expect((mockPool.query as jest.Mock).mock.calls[0][1]).toEqual([1]);
+      expect((mockPool.query as jest.Mock).mock.calls[0][1]).toEqual([1, 500, 0]);
       expect(result).toEqual(mockProjects);
+    });
+  });
+
+  describe('getProjects scoping', () => {
+    it('restricts the listing to the projects a scoped user may see', async () => {
+      (mockPool.query as jest.Mock).mockResolvedValue({ rows: [] });
+
+      await projectModel.getProjects(mockPool, {}, undefined, '7');
+
+      const [sql, params] = (mockPool.query as jest.Mock).mock.calls[0];
+      expect(sql).toContain('p.id IN (');
+      expect(params).toEqual(['7', 500, 0]);
+    });
+
+    it('leaves the listing unscoped when no user is given', async () => {
+      (mockPool.query as jest.Mock).mockResolvedValue({ rows: [] });
+
+      await projectModel.getProjects(mockPool);
+
+      expect((mockPool.query as jest.Mock).mock.calls[0][0]).not.toContain(
+        'p.id IN (',
+      );
     });
   });
 
@@ -271,7 +293,7 @@ describe('ProjectModel', () => {
       expect(query).not.toContain('evil_key');
       // Only status mapped to status_id; project_id, assignee_id, priority_id
       const values = (mockPool.query as jest.Mock).mock.calls[0][1];
-      expect(values).toEqual(['1', null, 1, null]);
+      expect(values).toEqual(['1', null, 1, null, 500, 0]);
     });
   });
 

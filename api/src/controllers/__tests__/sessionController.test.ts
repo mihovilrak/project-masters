@@ -101,7 +101,7 @@ describe('SessionController', () => {
 
       expect(mockRes.status).toHaveBeenCalledWith(401);
       expect(mockRes.json).toHaveBeenCalledWith({
-        message: 'Not authenticated',
+        error: 'Not authenticated',
       });
     });
 

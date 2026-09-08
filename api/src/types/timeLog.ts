@@ -28,7 +28,6 @@ export interface TimeLogQueryFilters {
   startDate?: Date;
   endDate?: Date;
   activity_type_id?: number;
-  user_id?: number;
 }
 
 export interface SpentTime {

@@ -124,6 +124,7 @@ describe('Notification Controller', () => {
       expect(notificationModel.getNotificationsByUserId).toHaveBeenCalledWith(
         mockPool,
         '1',
+        { limit: 500, offset: 0 },
       );
       expect(mockStatus).toHaveBeenCalledWith(200);
       expect(mockJson).toHaveBeenCalledWith(mockNotifications);

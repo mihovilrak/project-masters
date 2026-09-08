@@ -264,6 +264,20 @@ describe('Comment Controller', () => {
       expect(mockJson).toHaveBeenCalledWith(mockEditedComment);
     });
 
+    it('should return 404 when the comment does not exist', async () => {
+      mockRequest = {
+        params: { id: '999' },
+        body: { comment: 'Updated comment' } as CommentUpdateInput,
+      };
+
+      jest.spyOn(commentModel, 'editComment').mockResolvedValueOnce(null);
+
+      await editComment(mockRequest as Request, mockResponse, mockPool);
+
+      expect(mockStatus).toHaveBeenCalledWith(404);
+      expect(mockJson).toHaveBeenCalledWith({ error: 'Comment not found' });
+    });
+
     it('should handle errors', async () => {
       mockRequest = {
         params: { id: '1' },

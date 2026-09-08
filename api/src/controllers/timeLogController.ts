@@ -2,8 +2,13 @@ import { Request, Response } from 'express';
 import { Pool } from 'pg';
 import * as timeLogModel from '../models/timeLogModel';
 import { CustomRequest } from '../types/express';
-import { TimeLogCreateInput, TimeLogQueryFilters } from '../types/timeLog';
+import {
+  TimeLogCreateInput,
+  TimeLogQueryFilters,
+  TimeLogUpdateInput,
+} from '../types/timeLog';
 import logger from '../utils/logger';
+import { parsePagination } from '../utils/pagination';
 
 // Get all time logs
 export const getAllTimeLogs = async (
@@ -12,7 +17,10 @@ export const getAllTimeLogs = async (
   pool: Pool,
 ): Promise<Response | void> => {
   try {
-    const timeLogs = await timeLogModel.getAllTimeLogs(pool);
+    const timeLogs = await timeLogModel.getAllTimeLogs(
+      pool,
+      parsePagination(req.query),
+    );
     res.status(200).json(timeLogs);
   } catch (error) {
     logger.error({ err: error });
@@ -134,14 +142,26 @@ export const updateTimeLog = async (
 ): Promise<Response | void> => {
   try {
     const { timeLogId } = req.params;
-    const { log_date, spent_time, description, activity_type_id } = req.body;
+    const body = (req.body ?? {}) as TimeLogUpdateInput;
 
-    const timeLog = await timeLogModel.updateTimeLog(pool, timeLogId, {
-      log_date,
-      spent_time,
-      description,
-      activity_type_id,
-    });
+    // Forward only the keys actually sent so a partial update leaves the rest
+    // of the row intact.
+    const updates: TimeLogUpdateInput = {};
+    for (const key of [
+      'log_date',
+      'spent_time',
+      'description',
+      'activity_type_id',
+    ] as const) {
+      if (body[key] !== undefined) {
+        (updates as Record<string, unknown>)[key] = body[key];
+      }
+    }
+
+    const timeLog = await timeLogModel.updateTimeLog(pool, timeLogId, updates);
+    if (!timeLog) {
+      return res.status(404).json({ error: 'Time log not found' });
+    }
     res.status(200).json(timeLog);
   } catch (error) {
     logger.error({ err: error });

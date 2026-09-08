@@ -81,7 +81,7 @@ describe('TaskModel', () => {
       ];
       expect(mockPool.query).toHaveBeenCalledWith(
         expect.stringContaining('get_tasks'),
-        expectedNoFilter,
+        [...expectedNoFilter, 500, 0],
       );
       expect(result).toEqual(mockTasks);
     });
@@ -126,7 +126,7 @@ describe('TaskModel', () => {
       ];
       expect(mockPool.query).toHaveBeenCalledWith(
         expect.stringContaining('get_tasks'),
-        expectedWithFilter,
+        [...expectedWithFilter, 500, 0],
       );
       expect(result).toEqual(mockTasks);
     });
@@ -166,7 +166,7 @@ describe('TaskModel', () => {
       ];
       expect(mockPool.query).toHaveBeenCalledWith(
         expect.stringContaining('get_tasks'),
-        expectedNoFilter,
+        [...expectedNoFilter, 500, 0],
       );
       expect(result).toEqual([]);
     });
@@ -421,6 +421,31 @@ describe('TaskModel', () => {
     });
   });
 
+  describe('getTasks scoping', () => {
+    it('appends the access filter after the get_tasks arguments', async () => {
+      (mockPool.query as jest.Mock).mockResolvedValue(mockQueryResult([]));
+
+      await taskModel.getTasks(mockPool, undefined, undefined, '7');
+
+      const [sql, params] = (mockPool.query as jest.Mock).mock.calls[0];
+      expect(sql).toContain('WHERE project_id IN');
+      expect(sql).toContain('$27');
+      expect(sql).toContain('LIMIT $28 OFFSET $29');
+      expect(params).toHaveLength(29);
+      expect(params.slice(26)).toEqual(['7', 500, 0]);
+    });
+
+    it('leaves the query unscoped when no user is given', async () => {
+      (mockPool.query as jest.Mock).mockResolvedValue(mockQueryResult([]));
+
+      await taskModel.getTasks(mockPool);
+
+      expect((mockPool.query as jest.Mock).mock.calls[0][0]).not.toContain(
+        'WHERE project_id IN',
+      );
+    });
+  });
+
   describe('getTasksByProject', () => {
     it('should return tasks for a project', async () => {
       const projectTasks = [mockTask, { ...mockTask, id: 2 }];
@@ -432,9 +457,21 @@ describe('TaskModel', () => {
 
       expect(mockPool.query).toHaveBeenCalledWith(
         expect.stringContaining('get_tasks'),
-        ['1'],
+        ['1', 500, 0],
       );
+      expect(mockPool.query.mock.calls[0][0]).not.toContain('project_users');
       expect(result).toEqual(projectTasks);
+    });
+
+    it('restricts the query to the projects a scoped user may see', async () => {
+      (mockPool.query as jest.Mock).mockResolvedValue(mockQueryResult([]));
+
+      await taskModel.getTasksByProject(mockPool, '1', undefined, '7');
+
+      const [sql, params] = (mockPool.query as jest.Mock).mock.calls[0];
+      expect(sql).toContain('WHERE project_id IN');
+      expect(sql).toContain('LIMIT $3 OFFSET $4');
+      expect(params).toEqual(['1', '7', 500, 0]);
     });
   });
 

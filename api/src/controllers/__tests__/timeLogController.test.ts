@@ -81,7 +81,10 @@ describe('TimeLogController', () => {
         mockPool as Pool,
       );
 
-      expect(timeLogModel.getAllTimeLogs).toHaveBeenCalledWith(mockPool);
+      expect(timeLogModel.getAllTimeLogs).toHaveBeenCalledWith(
+        mockPool,
+        { limit: 500, offset: 0 },
+      );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(mockTimeLogs);
     });
@@ -393,6 +396,39 @@ describe('TimeLogController', () => {
       );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(updatedTimeLog);
+    });
+
+    it('should not forward fields the request body omitted', async () => {
+      mockReq.params = { timeLogId: '1' };
+      mockReq.body = { spent_time: 4.5 };
+      (timeLogModel.updateTimeLog as jest.Mock).mockResolvedValue({ id: '1' });
+
+      await timeLogController.updateTimeLog(
+        mockReq as Request,
+        mockRes as Response,
+        mockPool as Pool,
+      );
+
+      expect(timeLogModel.updateTimeLog).toHaveBeenCalledWith(mockPool, '1', {
+        spent_time: 4.5,
+      });
+    });
+
+    it('should return 404 when the time log does not exist', async () => {
+      mockReq.params = { timeLogId: '99' };
+      mockReq.body = { spent_time: 1 };
+      (timeLogModel.updateTimeLog as jest.Mock).mockResolvedValue(null);
+
+      await timeLogController.updateTimeLog(
+        mockReq as Request,
+        mockRes as Response,
+        mockPool as Pool,
+      );
+
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Time log not found',
+      });
     });
 
     it('should handle errors', async () => {

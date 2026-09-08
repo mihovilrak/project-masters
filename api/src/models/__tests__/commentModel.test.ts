@@ -171,6 +171,15 @@ describe('CommentModel', () => {
 
       expect(result).toBeNull();
     });
+
+    it('should not re-read the comment when the update matched no rows', async () => {
+      (mockPool.query as jest.Mock).mockResolvedValue(mockQueryResult([]));
+
+      const result = await commentModel.editComment(mockPool, '999', 'Nope');
+
+      expect(mockPool.query).toHaveBeenCalledTimes(1);
+      expect(result).toBeNull();
+    });
   });
 
   describe('deleteComment', () => {

@@ -8,6 +8,7 @@ import checkPermission from '../middleware/permissionMiddleware';
 import { requireTaskAccessBy } from '../middleware/projectAccessMiddleware';
 import * as fileController from '../controllers/fileController';
 import { withPool } from '../utils/withPool';
+import { uploadFileFilter } from '../utils/uploadFilter';
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, '../../uploads');
@@ -27,7 +28,12 @@ const storage = multer.diskStorage({
 });
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const upload = multer({ storage, limits: { fileSize: MAX_FILE_SIZE } });
+
+const upload = multer({
+  storage,
+  limits: { fileSize: MAX_FILE_SIZE },
+  fileFilter: uploadFileFilter,
+});
 
 // File routes
 export default (pool: Pool): Router => {

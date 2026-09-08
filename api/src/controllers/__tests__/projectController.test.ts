@@ -11,15 +11,14 @@ import { ProjectRequest } from '../../types/express';
 jest.mock('../../models/projectModel');
 jest.mock('../../models/notificationModel');
 jest.mock('../../models/accessModel', () => ({
-  filterByProjectAccess: jest.fn(
-    async (_pool: unknown, _userId: string, rows: unknown[]) => rows,
-  ),
+  resolveProjectScope: jest.fn(async (_pool: unknown, userId: string) => userId),
 }));
 
 describe('ProjectController', () => {
   let mockReq: any;
   let mockRes: Partial<Response>;
   let mockPool: Partial<Pool>;
+  let mockClient: { query: jest.Mock; release: jest.Mock };
 
   beforeEach(() => {
     const mockSession = {
@@ -69,7 +68,15 @@ describe('ProjectController', () => {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
     };
-    mockPool = {};
+    // addProjectMember runs inside withTransaction, so its models receive the
+    // pooled client rather than the pool itself.
+    mockClient = {
+      query: jest.fn().mockResolvedValue({ rows: [] }),
+      release: jest.fn(),
+    };
+    mockPool = {
+      connect: jest.fn().mockResolvedValue(mockClient),
+    } as unknown as Partial<Pool>;
     jest.clearAllMocks();
   });
 
@@ -87,9 +94,12 @@ describe('ProjectController', () => {
         mockPool as Pool,
       );
 
-      expect(projectModel.getProjects).toHaveBeenCalledWith(mockPool, {
-        statusId: 1,
-      });
+      expect(projectModel.getProjects).toHaveBeenCalledWith(
+        mockPool,
+        { statusId: 1 },
+        { limit: 500, offset: 0 },
+        '1',
+      );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(mockProjects);
     });
@@ -108,22 +118,17 @@ describe('ProjectController', () => {
         mockPool as Pool,
       );
 
-      expect(projectModel.getProjects).toHaveBeenCalledWith(mockPool, {
-        statusId: 2,
-        createdBy: 4,
-        dueDateFrom: '2026-01-01',
-      });
+      expect(projectModel.getProjects).toHaveBeenCalledWith(
+        mockPool,
+        { statusId: 2, createdBy: 4, dueDateFrom: '2026-01-01' },
+        { limit: 500, offset: 0 },
+        '1',
+      );
     });
 
-    it('should hide projects the user is not a member of', async () => {
-      const mockProjects = [
-        { id: '1', name: 'Mine', status_id: 1 },
-        { id: '2', name: "Somebody else's", status_id: 1 },
-      ];
+    it('scopes the query to the projects the user may see', async () => {
+      const mockProjects = [{ id: '1', name: 'Mine', status_id: 1 }];
       (projectModel.getProjects as jest.Mock).mockResolvedValue(mockProjects);
-      (accessModel.filterByProjectAccess as jest.Mock).mockResolvedValueOnce([
-        mockProjects[0],
-      ]);
 
       await projectController.getProjects(
         mockReq as any,
@@ -131,13 +136,35 @@ describe('ProjectController', () => {
         mockPool as Pool,
       );
 
-      expect(accessModel.filterByProjectAccess).toHaveBeenCalledWith(
+      expect(accessModel.resolveProjectScope).toHaveBeenCalledWith(
         mockPool,
         '1',
-        mockProjects,
-        'id',
       );
-      expect(mockRes.json).toHaveBeenCalledWith([mockProjects[0]]);
+      expect(projectModel.getProjects).toHaveBeenCalledWith(
+        mockPool,
+        expect.anything(),
+        expect.anything(),
+        '1',
+      );
+      expect(mockRes.json).toHaveBeenCalledWith(mockProjects);
+    });
+
+    it('leaves the query unscoped for an administrator', async () => {
+      (accessModel.resolveProjectScope as jest.Mock).mockResolvedValueOnce(null);
+      (projectModel.getProjects as jest.Mock).mockResolvedValue([]);
+
+      await projectController.getProjects(
+        mockReq as any,
+        mockRes as Response,
+        mockPool as Pool,
+      );
+
+      expect(projectModel.getProjects).toHaveBeenCalledWith(
+        mockPool,
+        expect.anything(),
+        expect.anything(),
+        null,
+      );
     });
 
     it('should reject an unauthenticated request', async () => {
@@ -583,6 +610,7 @@ describe('ProjectController', () => {
       expect(projectModel.getProjectMembers).toHaveBeenCalledWith(
         mockPool,
         '1',
+        { limit: 500, offset: 0 },
       );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(mockMembers);
@@ -626,10 +654,12 @@ describe('ProjectController', () => {
       );
 
       expect(projectModel.addProjectMember).toHaveBeenCalledWith(
-        mockPool,
+        mockClient,
         '1',
         '2',
       );
+      expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+      expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
       expect(
         notificationModel.createProjectMemberNotifications,
       ).toHaveBeenCalled();
@@ -652,6 +682,27 @@ describe('ProjectController', () => {
       expect(mockRes.json).toHaveBeenCalledWith({
         error: 'Project or user not found',
       });
+    });
+
+    it('should roll back when the notification write fails', async () => {
+      mockReq.params = { id: '1' };
+      mockReq.body = { userId: '2' };
+      (projectModel.addProjectMember as jest.Mock).mockResolvedValue({
+        project_id: '1',
+        user_id: '2',
+      });
+      (
+        notificationModel.createProjectMemberNotifications as jest.Mock
+      ).mockRejectedValue(new Error('Database error'));
+
+      await projectController.addProjectMember(
+        mockReq as any,
+        mockRes as Response,
+        mockPool as Pool,
+      );
+
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockRes.status).toHaveBeenCalledWith(500);
     });
 
     it('should handle errors', async () => {
@@ -751,7 +802,11 @@ describe('ProjectController', () => {
         mockPool as Pool,
       );
 
-      expect(projectModel.getSubprojects).toHaveBeenCalledWith(mockPool, '1');
+      expect(projectModel.getSubprojects).toHaveBeenCalledWith(
+        mockPool,
+        '1',
+        { limit: 500, offset: 0 },
+      );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(mockSubprojects);
     });
@@ -794,6 +849,7 @@ describe('ProjectController', () => {
         mockPool,
         '1',
         {},
+        { limit: 500, offset: 0 },
       );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(mockTasks);
@@ -811,11 +867,12 @@ describe('ProjectController', () => {
         mockPool as Pool,
       );
 
-      expect(projectModel.getProjectTasks).toHaveBeenCalledWith(mockPool, '1', {
-        status: 'active',
-        priority: 'high',
-        assignee: '2',
-      });
+      expect(projectModel.getProjectTasks).toHaveBeenCalledWith(
+        mockPool,
+        '1',
+        { status: 'active', priority: 'high', assignee: '2' },
+        { limit: 500, offset: 0 },
+      );
       expect(mockRes.status).toHaveBeenCalledWith(200);
     });
 

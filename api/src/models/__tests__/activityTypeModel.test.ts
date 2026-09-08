@@ -148,10 +148,12 @@ describe('ActivityTypeModel', () => {
       const result = await activityTypeModel.updateActivityType(
         mockPool,
         '1',
-        'Updated Activity',
-        'Updated description',
-        '#FFFF00',
-        'build',
+        {
+          name: 'Updated Activity',
+          description: 'Updated description',
+          color: '#FFFF00',
+          icon: 'build',
+        },
       );
 
       expect(mockPool.query).toHaveBeenCalledWith(
@@ -167,13 +169,44 @@ describe('ActivityTypeModel', () => {
       const result = await activityTypeModel.updateActivityType(
         mockPool,
         '999',
-        'Non-existent',
-        null,
-        '#000000',
-        null,
+        { name: 'Non-existent', color: '#000000' },
       );
 
       expect(result).toBeNull();
+    });
+
+    it('should only write the keys present in the payload', async () => {
+      (mockPool.query as jest.Mock).mockResolvedValue(mockQueryResult([{}]));
+
+      await activityTypeModel.updateActivityType(mockPool, '1', {
+        color: '#FFFF00',
+      });
+
+      const [sql, values] = (mockPool.query as jest.Mock).mock.calls[0];
+      expect(sql).toContain('color = $1');
+      expect(sql).not.toContain('name =');
+      expect(sql).not.toContain('description =');
+      expect(sql).not.toContain('icon =');
+      expect(values).toEqual(['#FFFF00', '1']);
+    });
+
+    it('should read the row back when no updatable key is provided', async () => {
+      const existing = { id: 1, name: 'Untouched' };
+      (mockPool.query as jest.Mock).mockResolvedValue(
+        mockQueryResult([existing]),
+      );
+
+      const result = await activityTypeModel.updateActivityType(
+        mockPool,
+        '1',
+        {},
+      );
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT * FROM activity_types'),
+        ['1'],
+      );
+      expect(result).toEqual(existing);
     });
   });
 

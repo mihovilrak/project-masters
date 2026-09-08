@@ -7,6 +7,7 @@ import * as settingsModel from '../models/settingsModel';
 import { CustomRequest } from '../types/express';
 import { SettingsUpdateInput } from '../types/settings';
 import logger from '../utils/logger';
+import { readEmailConfig } from '../config';
 
 // Get System Settings
 export const getSystemSettings = async (
@@ -278,7 +279,7 @@ export const getEnvSettings = async (
 };
 
 export const updateEnvSettings = async (
-  req: Request,
+  req: CustomRequest,
   res: Response,
   _pool: Pool,
 ): Promise<Response | void> => {
@@ -304,6 +305,26 @@ export const updateEnvSettings = async (
     const normalizedUpdates = Object.fromEntries(
       Object.entries(updates).map(([key, value]) => [key, String(value).trim()]),
     );
+
+    // Rewriting the process environment over HTTP is a wide blast radius, so
+    // every write leaves a trail naming the actor and the before/after value.
+    const previous = readEnvFile(filePath);
+    logger.warn(
+      {
+        actor: {
+          id: req.session?.user?.id,
+          login: req.session?.user?.login,
+        },
+        ip: req.ip,
+        changes: Object.entries(normalizedUpdates).map(([key, value]) => ({
+          key,
+          from: SECRET_PATTERNS.test(key) ? '****' : (previous[key] ?? null),
+          to: SECRET_PATTERNS.test(key) ? '****' : value,
+        })),
+      },
+      'Environment settings updated',
+    );
+
     writeEnvFile(filePath, normalizedUpdates);
 
     res.status(200).json({
@@ -342,8 +363,10 @@ export const testSmtpConnection = async (
       });
     }
 
+    const emailConfig = readEmailConfig();
+
     // Check if email is enabled
-    if (process.env.EMAIL_ENABLED !== 'true') {
+    if (!emailConfig.enabled) {
       return res.status(400).json({
         success: false,
         message:
@@ -353,12 +376,12 @@ export const testSmtpConnection = async (
 
     // Create transporter with environment config
     const transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.EMAIL_PORT || '587'),
-      secure: process.env.EMAIL_SECURE === 'true',
+      host: emailConfig.host,
+      port: emailConfig.port,
+      secure: emailConfig.secure,
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD,
+        user: emailConfig.user,
+        pass: emailConfig.password,
       },
     });
 
@@ -367,8 +390,7 @@ export const testSmtpConnection = async (
 
     // Send test email
     const info = await transporter.sendMail({
-      from:
-        process.env.EMAIL_FROM || 'Project Management <noreply@example.com>',
+      from: emailConfig.from,
       to: email,
       subject: 'SMTP Test - Project Management App',
       html: `

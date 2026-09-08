@@ -9,6 +9,25 @@ import {
 } from '../types/task';
 import { Pool, QueryResult } from 'pg';
 import { Queryable } from '../utils/transaction';
+import { buildUpdateAssignments } from '../utils/sqlUpdate';
+import { accessibleProjectsSubquery } from './accessModel';
+import {
+  Pagination,
+  defaultPagination,
+  paginationClause,
+} from '../utils/pagination';
+
+/**
+ * WHERE clause restricting tasks to the projects `scopeUserId` may see, using
+ * the placeholder at `index`. Empty string for an unscoped (administrator) read.
+ */
+const accessFilter = (
+  scopeUserId: string | null | undefined,
+  index: number,
+): string =>
+  scopeUserId == null
+    ? ''
+    : `WHERE project_id IN (${accessibleProjectsSubquery(index)})`;
 
 /** Normalize number | number[] into single and array for get_tasks. */
 function singleOrArray(val: number | number[] | null | undefined): {
@@ -25,6 +44,8 @@ function singleOrArray(val: number | number[] | null | undefined): {
 export const getTasks = async (
   pool: Pool,
   filters?: TaskQueryFilters,
+  pagination: Pagination = defaultPagination(),
+  scopeUserId?: string | null,
 ): Promise<TaskDetails[]> => {
   const whereParams = filters?.whereParams ?? {};
   const id = filters?.id ?? whereParams.id ?? null;
@@ -91,8 +112,14 @@ export const getTasks = async (
   const type = singleOrArray(type_id as number | number[] | null);
   const createdBy = singleOrArray(created_by as number | number[] | null);
 
+  const scoped = scopeUserId != null;
+  const where = accessFilter(scopeUserId, 27);
+  const page = paginationClause(pagination, scoped ? 28 : 27);
   const result: QueryResult<TaskDetails> = await pool.query(
-    `SELECT * FROM get_tasks($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)`,
+    `SELECT * FROM get_tasks($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+     ${where}
+     ORDER BY id
+     ${page.clause}`,
     [
       id ?? null,
       proj.single,
@@ -120,6 +147,8 @@ export const getTasks = async (
       proj.arr,
       type.arr,
       createdBy.arr,
+      ...(scoped ? [scopeUserId] : []),
+      ...page.values,
     ],
   );
   return result.rows;
@@ -189,51 +218,42 @@ export const createTask = async (
   return result.rows[0];
 };
 
+export const ALLOWED_TASK_UPDATE_KEYS = [
+  'name',
+  'project_id',
+  'holder_id',
+  'assignee_id',
+  'description',
+  'estimated_time',
+  'status_id',
+  'type_id',
+  'priority_id',
+  'start_date',
+  'due_date',
+  'end_date',
+  'progress',
+] as const;
+
 // Update a task
 export const updateTask = async (
   pool: Queryable,
   taskId: string,
   taskData: TaskUpdateInput,
 ): Promise<Task | null> => {
-  const allowedFields = [
-    'name',
-    'project_id',
-    'holder_id',
-    'assignee_id',
-    'description',
-    'estimated_time',
-    'status_id',
-    'type_id',
-    'priority_id',
-    'start_date',
-    'due_date',
-    'end_date',
-    'progress',
-  ] as const;
-
-  // Filter out undefined values and invalid fields
-  const updates = Object.entries(taskData)
-    .filter(
-      ([key, value]) =>
-        allowedFields.includes(key as keyof TaskUpdateInput) &&
-        value !== undefined,
-    )
-    .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
-
-  if (Object.keys(updates).length === 0) {
+  const assignments = buildUpdateAssignments(
+    taskData as Record<string, unknown>,
+    ALLOWED_TASK_UPDATE_KEYS,
+  );
+  if (!assignments) {
     return null;
   }
 
-  const setClause = Object.keys(updates)
-    .map((key, index) => `${key} = $${index + 1}`)
-    .join(', ');
-
   const result: QueryResult<Task> = await pool.query(
     `UPDATE tasks
-     SET ${setClause}
-     WHERE id = $${Object.keys(updates).length + 1}
+     SET ${assignments.setClause}
+     WHERE id = $${assignments.nextIndex}
      RETURNING *`,
-    [...Object.values(updates), taskId],
+    [...assignments.values, taskId],
   );
 
   return result.rows[0] || null;
@@ -304,11 +324,18 @@ export const getActiveTasks = async (
 export const getTasksByProject = async (
   pool: Pool,
   project_id: string,
+  pagination: Pagination = defaultPagination(),
+  scopeUserId?: string | null,
 ): Promise<TaskDetails[]> => {
+  const scoped = scopeUserId != null;
+  const where = accessFilter(scopeUserId, 2);
+  const page = paginationClause(pagination, scoped ? 3 : 2);
   const result: QueryResult<TaskDetails> = await pool.query(
     `SELECT * FROM get_tasks(null, $1, null, null, null, null, null, null, false, null, null, null, null, null, null, null, null, null, false, null, null, null, null, null, null, null)
-     ORDER BY created_on DESC`,
-    [project_id],
+     ${where}
+     ORDER BY created_on DESC, id DESC
+     ${page.clause}`,
+    [project_id, ...(scoped ? [scopeUserId] : []), ...page.values],
   );
   return result.rows;
 };

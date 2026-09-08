@@ -7,10 +7,12 @@ import {
 } from '../types/project';
 import { CustomRequest, ProjectRequest } from '../types/express';
 import * as projectModel from '../models/projectModel';
-import { filterByProjectAccess } from '../models/accessModel';
+import { resolveProjectScope } from '../models/accessModel';
 import * as notificationModel from '../models/notificationModel';
 import { NotificationType } from '../types/notification';
 import logger from '../utils/logger';
+import { parsePagination } from '../utils/pagination';
+import { withTransaction } from '../utils/transaction';
 import { ProjectStatusId } from '../constants/statusIds';
 import { mapProjectQueryFilters } from '../mappers/projectFilters';
 
@@ -32,9 +34,15 @@ export const getProjects = async (
       return;
     }
 
-    const projects = await projectModel.getProjects(pool, filters);
-    const visible = await filterByProjectAccess(pool, userId, projects, 'id');
-    res.status(200).json(visible);
+    // Scoped in the query rather than filtered afterwards, so a page is not
+    // silently shortened by rows the user cannot see.
+    const projects = await projectModel.getProjects(
+      pool,
+      filters,
+      parsePagination(req.query),
+      await resolveProjectScope(pool, userId),
+    );
+    res.status(200).json(projects);
   } catch (error) {
     logger.error({ err: error }, 'Error fetching projects');
     res.status(500).json({ error: 'Internal server error' });
@@ -229,7 +237,11 @@ export const getProjectMembers = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const members = await projectModel.getProjectMembers(pool, id);
+    const members = await projectModel.getProjectMembers(
+      pool,
+      id,
+      parsePagination(req.query),
+    );
     res.status(200).json(members);
   } catch (error) {
     logger.error({ err: error }, 'Error fetching project members');
@@ -246,17 +258,25 @@ export const addProjectMember = async (
   const { id } = req.params;
   const { userId } = req.body;
   try {
-    const result = await projectModel.addProjectMember(pool, id, userId);
+    // Membership and its notifications are one unit of work: a failed
+    // notification must not leave a silently unannounced member behind.
+    const result = await withTransaction(pool, async (client) => {
+      const member = await projectModel.addProjectMember(client, id, userId);
+      if (!member) {
+        return null;
+      }
+      await notificationModel.createProjectMemberNotifications(client, {
+        project_id: parseInt(id),
+        action_user_id: parseInt(userId),
+        type_id: NotificationType.ProjectMemberAdded,
+      });
+      return member;
+    });
+
     if (!result) {
       res.status(404).json({ error: 'Project or user not found' });
       return;
     }
-    // Create notification for project creation
-    await notificationModel.createProjectMemberNotifications(pool, {
-      project_id: parseInt(id),
-      action_user_id: parseInt(userId),
-      type_id: NotificationType.ProjectMemberAdded,
-    });
     res.status(201).json(result);
   } catch (error) {
     logger.error({ err: error }, 'Error adding project member');
@@ -293,7 +313,11 @@ export const getSubprojects = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const subprojects = await projectModel.getSubprojects(pool, id);
+    const subprojects = await projectModel.getSubprojects(
+      pool,
+      id,
+      parsePagination(req.query),
+    );
     res.status(200).json(subprojects);
   } catch (error) {
     logger.error({ err: error }, 'Error fetching subprojects');
@@ -316,7 +340,12 @@ export const getProjectTasks = async (
     if (priority) filters.priority = priority;
     if (assignee) filters.assignee = assignee;
 
-    const tasks = await projectModel.getProjectTasks(pool, projectId, filters);
+    const tasks = await projectModel.getProjectTasks(
+      pool,
+      projectId,
+      filters,
+      parsePagination(req.query),
+    );
     res.status(200).json(tasks);
   } catch (error) {
     logger.error({ err: error }, 'Error fetching project tasks');

@@ -44,12 +44,18 @@ export const editComment = async (
   comment: string,
 ): Promise<CommentWithUser | null> => {
   // Update the comment
-  await pool.query(
+  const updated = await pool.query(
     `UPDATE comments
     SET (comment, updated_on) = ($2, current_timestamp)
-    WHERE id = $1`,
+    WHERE id = $1 AND active`,
     [id, comment],
   );
+
+  // A stale or deleted id matches nothing; report that instead of returning the
+  // row a follow-up read might still find.
+  if (!updated.rowCount) {
+    return null;
+  }
 
   // Fetch the updated comment with user details
   const result = await pool.query('SELECT * FROM get_comment_by_id($1)', [id]);

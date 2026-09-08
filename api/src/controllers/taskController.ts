@@ -7,38 +7,13 @@ import {
   TaskQueryFilters,
 } from '../types/task';
 import * as taskModel from '../models/taskModel';
-import { filterByProjectAccess } from '../models/accessModel';
+import { resolveProjectScope } from '../models/accessModel';
 import * as notificationModel from '../models/notificationModel';
 import { NotificationType } from '../types/notification';
 import logger from '../utils/logger';
+import { parsePagination } from '../utils/pagination';
 import { withTransaction } from '../utils/transaction';
-
-/** Convert date from request (Date or ISO string) to timestamp; null/undefined → NaN. */
-function toTimestamp(d: Date | string | null | undefined): number {
-  if (d == null) return NaN;
-  return d instanceof Date ? d.getTime() : new Date(d).getTime();
-}
-
-/**
- * Parse a query param into a single number or array of numbers (comma-separated).
- * Returns null if value is missing, invalid, or parses to empty (so caller should not set the filter).
- */
-function parseIdParam(
-  value: string | string[] | undefined,
-): number | number[] | null {
-  if (value === undefined || value === null) return null;
-  const str = Array.isArray(value) ? value.join(',') : String(value).trim();
-  if (str === '') return null;
-  if (str.includes(',')) {
-    const arr = str
-      .split(',')
-      .map((s) => Number(s.trim()))
-      .filter((n) => !Number.isNaN(n));
-    return arr.length > 0 ? arr : null;
-  }
-  const num = Number(str);
-  return Number.isNaN(num) ? null : num;
-}
+import { parseIdParam, toTimestamp } from '../utils/requestParsing';
 
 // Get tasks
 export const getTasks = async (
@@ -96,14 +71,19 @@ export const getTasks = async (
       inactive_statuses_only,
       active_statuses_only,
     ].some(Boolean);
+    const pagination = parsePagination(req.query);
+    // Tasks inherit their project's tenancy, so the listing is scoped inside the
+    // query rather than filtered afterwards - otherwise paging drops rows.
+    const scopeUserId = await resolveProjectScope(pool, userId);
+
     if (project_id && !otherFilters) {
       const tasks = await taskModel.getTasksByProject(
         pool,
         project_id as string,
+        pagination,
+        scopeUserId,
       );
-      res
-        .status(200)
-        .json(await filterByProjectAccess(pool, userId, tasks, 'project_id'));
+      res.status(200).json(tasks);
       return;
     }
 
@@ -175,11 +155,10 @@ export const getTasks = async (
     const tasks = await taskModel.getTasks(
       pool,
       hasFilters ? filters : undefined,
+      pagination,
+      scopeUserId,
     );
-    // Tasks inherit their project's tenancy, so a listing is scoped the same way.
-    res
-      .status(200)
-      .json(await filterByProjectAccess(pool, userId, tasks, 'project_id'));
+    res.status(200).json(tasks);
   } catch (error) {
     logger.error({ err: error }, 'Error fetching tasks');
     res.status(500).json({ error: 'Internal server error' });
@@ -218,7 +197,7 @@ export const getTaskByAssignee = async (
       whereParams: { assignee_id: Number(assignee_id) },
     });
     if (!result || result.length === 0) {
-      res.status(404).json({ message: 'No tasks assigned' });
+      res.status(404).json({ error: 'No tasks assigned' });
       return;
     }
     res.status(200).json(result);
@@ -240,7 +219,7 @@ export const getTaskByHolder = async (
       whereParams: { holder_id: Number(holder_id) },
     });
     if (!result || result.length === 0) {
-      res.status(404).json({ message: 'No tasks assigned' });
+      res.status(404).json({ error: 'No tasks assigned' });
       return;
     }
     res.status(200).json(result);

@@ -3,18 +3,7 @@ import { Pool } from 'pg';
 import * as watcherModel from '../models/watcherModel';
 import { isTaskProjectMember } from '../models/accessModel';
 import logger from '../utils/logger';
-
-const parsePositiveInteger = (value: unknown): number | null => {
-  if (
-    (typeof value !== 'string' && typeof value !== 'number') ||
-    !/^\d+$/.test(String(value))
-  ) {
-    return null;
-  }
-
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
-};
+import { parsePositiveInteger } from '../utils/requestParsing';
 
 // Get task watchers
 export const getTaskWatchers = async (

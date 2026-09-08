@@ -1,6 +1,6 @@
 import path from 'path';
 import dotenv from 'dotenv';
-import { Config } from './types/config';
+import { Config, EmailConfig } from './types/config';
 import logger from './utils/logger';
 import {
   readDatabaseConfig,
@@ -70,5 +70,29 @@ function validateConfig(): void {
 }
 
 validateConfig();
+
+const DEFAULT_EMAIL_PORT = 587;
+
+// Read at call time rather than at import: the settings endpoint can rewrite
+// .env while the process runs, and the caller decides how to report a bad value
+// (unlike the startup config, which exits).
+export const readEmailConfig = (
+  env: NodeJS.ProcessEnv = process.env,
+): EmailConfig => {
+  const port = parseInt(env.EMAIL_PORT || String(DEFAULT_EMAIL_PORT), 10);
+
+  return {
+    enabled: env.EMAIL_ENABLED === 'true',
+    host: env.EMAIL_HOST || 'smtp.gmail.com',
+    port:
+      Number.isFinite(port) && port > 0 && port <= 65535
+        ? port
+        : DEFAULT_EMAIL_PORT,
+    secure: env.EMAIL_SECURE === 'true',
+    user: env.EMAIL_USER,
+    password: env.EMAIL_PASSWORD,
+    from: env.EMAIL_FROM || 'Project Management <noreply@example.com>',
+  };
+};
 
 export default config;

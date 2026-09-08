@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import * as notificationModel from '../models/notificationModel';
 import { CustomRequest } from '../types/express';
 import logger from '../utils/logger';
+import { parsePagination } from '../utils/pagination';
 
 // Get notifications of the current user
 export const getUserNotifications = async (
@@ -18,6 +19,7 @@ export const getUserNotifications = async (
     const notifications = await notificationModel.getNotificationsByUserId(
       pool,
       String(userId),
+      parsePagination(req.query),
     );
     res.status(200).json(notifications);
   } catch (error) {

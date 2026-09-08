@@ -5,3 +5,13 @@ export interface Config {
   feUrl: string;
   nodeEnv: string;
 }
+
+export interface EmailConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  secure: boolean;
+  user?: string;
+  password?: string;
+  from: string;
+}

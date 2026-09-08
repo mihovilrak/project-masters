@@ -37,20 +37,33 @@ export const isTaskProjectMember = async (
   return (result.rowCount ?? 0) > 0;
 };
 
-// Every project id the user may see, for scoping list endpoints
+// Every project id the user may see. Embed this in a list query instead of
+// fetching the ids first and filtering in JS: post-filtering a paged result
+// silently returns short pages.
+export const accessibleProjectsSubquery = (userIdIndex: number): string =>
+  `SELECT DISTINCT ap.id
+    FROM projects ap
+    LEFT JOIN project_users apu ON apu.project_id = ap.id AND apu.user_id = $${userIdIndex}
+    WHERE apu.user_id IS NOT NULL OR ap.created_by = $${userIdIndex}`;
+
 export const getAccessibleProjectIds = async (
   pool: Pool,
   userId: string,
 ): Promise<number[]> => {
   const result = await pool.query<{ id: number }>(
-    `SELECT DISTINCT p.id
-    FROM projects p
-    LEFT JOIN project_users pu ON pu.project_id = p.id AND pu.user_id = $1
-    WHERE pu.user_id IS NOT NULL OR p.created_by = $1`,
+    accessibleProjectsSubquery(1),
     [userId],
   );
   return result.rows.map((row) => Number(row.id));
 };
+
+// The user id a list query must scope to, or null when the user is an
+// administrator and sees everything.
+export const resolveProjectScope = async (
+  pool: Pool,
+  userId: string,
+): Promise<string | null> =>
+  (await hasPermission(pool, userId, 'Admin')) ? null : userId;
 
 // Drop rows belonging to projects the user cannot reach. Administrators keep
 // the full result set.
