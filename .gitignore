@@ -3,7 +3,6 @@
 instructions.md
 db/backup/
 .obsolete
-**/run_tests.sh
 .env
 .env.test
 **/dist/
@@ -11,5 +10,4 @@ db/backup/
 *.log
 .cursorrules
 mcp-test-server/
-scripts/
 api/uploads/
