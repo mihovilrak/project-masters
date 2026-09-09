@@ -1,10 +1,14 @@
 import * as schedule from 'node-schedule';
+import type { Server } from 'http';
 import { config, validateConfig } from './config';
 import { pool } from './db';
-import { server } from './server';
+import { startServer, stopSmtpProbe } from './server';
+import { scheduleCleanup } from './jobs/cleanup';
+import { emailService } from './services/emailService';
 import { notificationService } from './services/notificationService';
 import { logger } from './utils/logger';
-import './jobs/cleanup';
+
+let server: Server | null = null;
 
 const initializeService = async (): Promise<void> => {
   try {
@@ -14,10 +18,14 @@ const initializeService = async (): Promise<void> => {
     await pool.query('SELECT 1');
     logger.info('Database connection established');
 
-    // Schedule email processing
+    await emailService.initializeTemplates();
+
+    server = startServer();
+
     schedule.scheduleJob('*/1 * * * *', async () => {
       await notificationService.processNewNotifications();
     });
+    scheduleCleanup();
     logger.info('Email processing scheduled');
   } catch (error) {
     logger.error({ err: error }, 'Service initialization failed');
@@ -25,24 +33,33 @@ const initializeService = async (): Promise<void> => {
   }
 };
 
-// Handle graceful shutdown (single place; wait for server.close then pool.end)
+const closePool = (): void => {
+  pool
+    .end()
+    .then(() => process.exit(0))
+    .catch((error) => {
+      logger.error({ err: error }, 'Error closing pool');
+      process.exit(1);
+    });
+};
+
 const shutdown = (signal: string): void => {
   logger.info(`${signal} received. Shutting down gracefully...`);
+  stopSmtpProbe();
+  void schedule.gracefulShutdown();
+
+  if (!server) {
+    closePool();
+    return;
+  }
+
   server.close((err) => {
     if (err) {
       logger.error({ err }, 'Error closing server');
       process.exit(1);
     }
     logger.info('Server closed');
-    pool
-      .end()
-      .then(() => {
-        process.exit(0);
-      })
-      .catch((error) => {
-        logger.error({ err: error }, 'Error closing pool');
-        process.exit(1);
-      });
+    closePool();
   });
 };
 

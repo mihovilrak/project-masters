@@ -96,42 +96,46 @@ describe('EmailService', () => {
     });
   });
 
-  describe('validateTemplate', () => {
-    it('should return true for valid template', async () => {
+  describe('initializeTemplates', () => {
+    it('should preload every notification template', async () => {
       const { emailService } = await import('../../services/emailService');
 
-      const isValid = await emailService.validateTemplate('default');
+      await emailService.initializeTemplates();
 
-      expect(isValid).toBe(true);
-    });
-
-    it('should return false for invalid template', async () => {
-      const { emailService } = await import('../../services/emailService');
-
-      const isValid = await emailService.validateTemplate(
-        'nonExistentTemplate',
-      );
-
-      expect(isValid).toBe(false);
-    });
-
-    it('should validate all notification templates', async () => {
-      const { emailService } = await import('../../services/emailService');
-
-      const templates = [
-        'taskDueSoon',
+      expect(Object.keys(emailService.templates).sort()).toEqual([
+        'default',
+        'projectUpdate',
         'taskAssigned',
-        'taskUpdated',
         'taskComment',
         'taskCompleted',
-        'projectUpdate',
-        'default',
-      ];
+        'taskDueSoon',
+        'taskUpdated',
+      ]);
+    });
 
-      for (const templateName of templates) {
-        const isValid = await emailService.validateTemplate(templateName);
-        expect(isValid).toBe(true);
-      }
+    it('should rethrow when the template directory is missing', async () => {
+      process.env.TEMPLATES_PATH = path.join(__dirname, 'no-such-dir');
+      jest.resetModules();
+
+      const { emailService } = await import('../../services/emailService');
+
+      await expect(emailService.initializeTemplates()).rejects.toThrow();
+
+      delete process.env.TEMPLATES_PATH;
+    });
+  });
+
+  describe('refreshTransport', () => {
+    it('should replace the transporter and close the previous one', async () => {
+      const { emailService } = await import('../../services/emailService');
+
+      const previous = emailService.transporter;
+      const closeSpy = jest.spyOn(previous, 'close');
+
+      emailService.refreshTransport();
+
+      expect(emailService.transporter).not.toBe(previous);
+      expect(closeSpy).toHaveBeenCalled();
     });
   });
 

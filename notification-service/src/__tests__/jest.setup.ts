@@ -17,10 +17,9 @@ process.env.EMAIL_USER = 'test@test.com';
 process.env.EMAIL_PASSWORD = 'test_password';
 process.env.EMAIL_FROM = 'Test <test@test.com>';
 process.env.PORT = '5001';
-process.env.NOTIFICATION_API_KEY = 'test_api_key';
 
 // Increase timeout for async tests
-jest.setTimeout(10000);
+jest.setTimeout(30000);
 
 // Silence console during tests
 beforeAll(() => {

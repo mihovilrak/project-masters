@@ -1,61 +1,77 @@
 import express, { Request, Response, NextFunction } from 'express';
+import type { Server } from 'http';
 import { emailService } from './services/emailService';
 import { pool } from './db';
 import { config } from './config';
-import { rateLimiter } from './middleware/rateLimiter';
-import { apiKeyAuth } from './middleware/apiKeyAuth';
-import { notificationRoutes } from './routes/notifications';
-import { metrics } from './metrics';
 import { logger } from './utils/logger';
 
-const app = express();
+const SMTP_PROBE_INTERVAL_MS = 60000;
 
-app.use(express.json());
-app.use('/api/notifications', apiKeyAuth, rateLimiter, notificationRoutes);
+let smtpHealthy: boolean | null = null;
+let smtpProbeTimer: NodeJS.Timeout | null = null;
 
-app.get('/ready', async (_req: Request, res: Response) => {
-  try {
-    await pool.query('SELECT 1');
-    res.status(200).json({ status: 'ready' });
-  } catch {
-    res.status(503).json({ status: 'not ready' });
+const probeSmtp = async (): Promise<void> => {
+  if (!config.app.emailEnabled) {
+    smtpHealthy = null;
+    return;
   }
-});
-
-// Health check endpoint
-app.get('/health', async (req: Request, res: Response) => {
   try {
-    await pool.query('SELECT 1');
     await emailService.transporter.verify();
-
-    res.json({
-      status: 'healthy',
-      database: 'connected',
-      email: 'connected',
-      metrics: {
-        notificationsSent: metrics.notificationsSent,
-        emailErrors: metrics.emailErrors,
-        notificationErrors: metrics.notificationErrors,
-        notificationsDeadLettered: metrics.notificationsDeadLettered,
-        lastProcessingTime: metrics.lastProcessingTime,
-      },
-      timestamp: new Date(),
-    });
+    smtpHealthy = true;
   } catch (error) {
-    logger.error({ err: error }, 'Health check failed');
-    res.status(503).json({ status: 'unhealthy', error: 'Service unavailable' });
+    smtpHealthy = false;
+    logger.warn({ err: error }, 'SMTP probe failed');
   }
-});
+};
 
-// Error handling middleware
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  logger.error({ err }, 'Unhandled error');
-  res.status(500).json({ error: 'Internal server error' });
-});
+export const startSmtpProbe = (): void => {
+  if (smtpProbeTimer) return;
+  void probeSmtp();
+  smtpProbeTimer = setInterval(() => void probeSmtp(), SMTP_PROBE_INTERVAL_MS);
+  // Never hold the event loop open just for the probe.
+  smtpProbeTimer.unref();
+};
 
-const port = config.app.port || 5001;
-const server = app.listen(port, () => {
-  logger.info(`Server running on port ${port}`);
-});
+export const stopSmtpProbe = (): void => {
+  if (!smtpProbeTimer) return;
+  clearInterval(smtpProbeTimer);
+  smtpProbeTimer = null;
+};
 
-export { server };
+export const createServer = (): express.Express => {
+  const app = express();
+
+  // Compose healthcheck target: the only endpoint allowed to touch the database.
+  app.get('/ready', async (_req: Request, res: Response) => {
+    try {
+      await pool.query('SELECT 1');
+      res.status(200).json({ status: 'ready' });
+    } catch {
+      res.status(503).json({ status: 'not ready' });
+    }
+  });
+
+  // Answers from cached probe state so it cannot be used to hammer SMTP or the pool.
+  app.get('/health', (_req: Request, res: Response) => {
+    const healthy = smtpHealthy !== false;
+    res
+      .status(healthy ? 200 : 503)
+      .json({ status: healthy ? 'healthy' : 'unhealthy' });
+  });
+
+  app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+    logger.error({ err }, 'Unhandled error');
+    res.status(500).json({ error: 'Internal server error' });
+  });
+
+  return app;
+};
+
+export const startServer = (): Server => {
+  const port = config.app.port || 5001;
+  const server = createServer().listen(port, () => {
+    logger.info(`Server running on port ${port}`);
+  });
+  startSmtpProbe();
+  return server;
+};

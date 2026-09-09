@@ -6,6 +6,23 @@ const createLogger = (env = process.env) => {
   const isTest = env.NODE_ENV === 'test';
   return pino({
     level: env.LOG_LEVEL || 'info',
+    redact: {
+      paths: [
+        'password',
+        '*.password',
+        '*.pass',
+        'auth.pass',
+        '*.auth.pass',
+        'config.email.auth.pass',
+        'EMAIL_PASSWORD',
+        '*.EMAIL_PASSWORD',
+        'POSTGRES_PASSWORD',
+        '*.POSTGRES_PASSWORD',
+        'SESSION_SECRET',
+        '*.SESSION_SECRET',
+      ],
+      censor: '[redacted]',
+    },
     ...(isDev &&
       !isTest && {
         transport: {

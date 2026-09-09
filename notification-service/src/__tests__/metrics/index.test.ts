@@ -60,17 +60,33 @@ describe('Metrics', () => {
     });
   });
 
-  describe('logMetrics', () => {
-    it('should not throw when called', () => {
-      expect(() => metrics.logMetrics()).not.toThrow();
+  describe('scheduleLogMetrics', () => {
+    afterEach(() => {
+      jest.useRealTimers();
     });
 
-    it('should log metrics when METRICS_ENABLED is true', () => {
+    it('should do nothing when METRICS_ENABLED is not true', () => {
+      const originalValue = process.env.METRICS_ENABLED;
+      delete process.env.METRICS_ENABLED;
+      jest.useFakeTimers();
+
+      metrics.scheduleLogMetrics();
+      expect(jest.getTimerCount()).toBe(0);
+
+      process.env.METRICS_ENABLED = originalValue;
+    });
+
+    it('should debounce flushes when METRICS_ENABLED is true', () => {
       const originalValue = process.env.METRICS_ENABLED;
       process.env.METRICS_ENABLED = 'true';
+      jest.useFakeTimers();
 
-      // Should not throw even when enabled
-      expect(() => metrics.logMetrics()).not.toThrow();
+      metrics.scheduleLogMetrics();
+      metrics.scheduleLogMetrics();
+      expect(jest.getTimerCount()).toBe(1);
+
+      expect(() => jest.runOnlyPendingTimers()).not.toThrow();
+      expect(jest.getTimerCount()).toBe(0);
 
       process.env.METRICS_ENABLED = originalValue;
     });

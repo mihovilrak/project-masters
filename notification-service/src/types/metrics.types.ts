@@ -13,5 +13,4 @@ export interface Metrics {
   increment(metric: MetricType): void;
   setProcessingTime(): void;
   scheduleLogMetrics(): void;
-  logMetrics(): void;
 }

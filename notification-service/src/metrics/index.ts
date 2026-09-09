@@ -29,12 +29,8 @@ const metrics: Metrics = {
       metricsFlushScheduled = null;
       metricsLogger.info({ ...this }, 'metrics_update');
     }, METRICS_DEBOUNCE_MS);
-  },
-
-  logMetrics(): void {
-    if (process.env.METRICS_ENABLED === 'true') {
-      metricsLogger.info({ ...this }, 'metrics_update');
-    }
+    // A pending flush must never keep the process alive during shutdown.
+    metricsFlushScheduled.unref();
   },
 };
 

@@ -17,17 +17,32 @@ class EmailService implements IEmailService {
   private templateDir: string;
 
   constructor() {
-    this.transporter = nodemailer.createTransport({
+    this.transporter = EmailService.createTransport();
+    this.templates = {};
+    // start-app.sh sets TEMPLATES_PATH; the fallback matches the compiled
+    // layout, where templates sit beside services/ under dist/.
+    this.templateDir =
+      process.env.TEMPLATES_PATH ?? path.join(__dirname, '..', 'templates');
+  }
+
+  private static createTransport(): nodemailer.Transporter {
+    return nodemailer.createTransport({
       host: config.email.host,
       port: config.email.port,
       secure: config.email.secure,
       auth: config.email.auth,
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 100,
     });
+  }
 
-    this.templates = {};
-    this.templateDir =
-      process.env.TEMPLATES_PATH ?? path.join(__dirname, '..', 'templates');
-    this.initializeTemplates();
+  // Called when the admin UI changes SMTP settings; the old pool is closed so
+  // its keep-alive connections do not outlive the credentials they used.
+  refreshTransport(): void {
+    const previous = this.transporter;
+    this.transporter = EmailService.createTransport();
+    previous.close();
   }
 
   async initializeTemplates(): Promise<void> {
@@ -41,7 +56,11 @@ class EmailService implements IEmailService {
         }
       }
     } catch (error) {
-      logger.error({ err: error }, 'Failed to initialize email templates');
+      logger.error(
+        { err: error, templateDir: this.templateDir },
+        'Failed to initialize email templates',
+      );
+      throw error;
     }
   }
 
@@ -102,17 +121,6 @@ class EmailService implements IEmailService {
         if (attempt === retries) throw error;
         await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
       }
-    }
-  }
-
-  async validateTemplate(name: string): Promise<boolean> {
-    try {
-      const template = await this.loadTemplate(name);
-      template({});
-      return true;
-    } catch (error) {
-      logger.error({ err: error, name }, 'Template validation failed');
-      return false;
     }
   }
 }

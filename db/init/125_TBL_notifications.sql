@@ -12,6 +12,7 @@ create table if not exists notifications (
     emailed_on timestamptz null,
     email_attempts int2 default 0 not null,
     email_attempted_on timestamptz null,
+    archived_on timestamptz null,
     created_on timestamptz default current_timestamp not null
 );
 
@@ -22,8 +23,15 @@ alter table notifications add column if not exists emailed_on timestamptz null;
 alter table notifications add column if not exists email_attempts int2 default 0 not null;
 alter table notifications add column if not exists email_attempted_on timestamptz null;
 
+-- archived_on separates "aged out by the cleanup job" from the active = false
+-- that api/ writes when a user deletes a notification; both used to be the
+-- same flag, so the two were indistinguishable after the fact.
+alter table notifications add column if not exists archived_on timestamptz null;
+
 create index if not exists notifications_user_idx on notifications(user_id);
 create index if not exists notifications_type_idx on notifications(type_id);
 create index if not exists notifications_created_idx on notifications(created_on);
 create index if not exists notifications_user_active_created_idx on notifications (user_id, active, created_on desc);
 create index if not exists notifications_email_pending_idx on notifications (created_on) where emailed_on is null and active;
+create index if not exists notifications_cleanup_idx on notifications (created_on)
+    where active and (is_read or read_on is not null);

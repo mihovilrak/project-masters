@@ -35,5 +35,4 @@ export interface EmailService {
     data: any,
     retries?: number,
   ): Promise<EmailInfo | void>;
-  validateTemplate(name: string): Promise<boolean>;
 }

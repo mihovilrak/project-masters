@@ -22,12 +22,12 @@ export interface EmailConfig {
 export interface AppConfig {
   nodeEnv: string;
   emailEnabled: boolean;
-  baseUrl: string;
   port: number;
 }
 
 export interface Config {
   db: DbConfig;
   email: EmailConfig;
+  appBaseUrl: string;
   app: AppConfig;
 }

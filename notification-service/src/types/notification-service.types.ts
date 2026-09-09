@@ -4,6 +4,7 @@ export interface DatabaseNotification {
   id: string;
   user_id: string;
   type_id: number;
+  type_name: string;
   title: string;
   message: string;
   link: string;
@@ -23,7 +24,12 @@ export type NotificationTemplateType =
   | 'projectUpdate'
   | 'default';
 
-export interface NotificationEmailData {
+// The `data` jsonb column is spread in alongside these, so templates can also
+// read per-type fields (taskName, projectName, priority, ...).
+export interface NotificationEmailData extends Record<string, unknown> {
   userName: string;
   taskUrl: string;
+  title: string;
+  message: string;
+  typeName: string;
 }

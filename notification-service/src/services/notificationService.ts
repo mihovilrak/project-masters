@@ -1,5 +1,5 @@
-import { PoolClient } from 'pg';
 import { pool } from '../db';
+import { config, reloadEmailConfig } from '../config';
 import { logger } from '../utils/logger';
 import { emailService } from './emailService';
 import { metrics } from '../metrics';
@@ -8,7 +8,6 @@ import {
   NotificationTemplateType,
   NotificationEmailData,
 } from '../types/notification-service.types';
-import { NotificationCreateResponse } from '../types/notification-routes.types';
 
 const BATCH_LIMIT = 100;
 const SEND_CONCURRENCY = 5;
@@ -16,25 +15,27 @@ const SEND_CONCURRENCY = 5;
 // function stops handing it out and the failure is logged and counted.
 const MAX_EMAIL_ATTEMPTS = 5;
 
-async function runWithConcurrency<T, R>(
+async function runWithConcurrency<T>(
   items: T[],
   concurrency: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = [];
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
   let i = 0;
   while (i < items.length) {
     const chunk = items.slice(i, i + concurrency);
     i += chunk.length;
-    const chunkResults = await Promise.all(chunk.map(fn));
-    results.push(...chunkResults);
+    await Promise.all(chunk.map(fn));
   }
-  return results;
 }
 
 class NotificationService {
   async processNewNotifications(): Promise<void> {
     try {
+      // SMTP settings are editable from the admin UI while the service runs.
+      if (reloadEmailConfig()) {
+        emailService.refreshTransport();
+      }
+
       // Claiming is one committed statement on purpose: the previous version
       // held FOR UPDATE row locks across every SMTP round-trip, and a failed
       // COMMIT re-sent the whole batch on the next tick.
@@ -43,12 +44,15 @@ class NotificationService {
         [BATCH_LIMIT, MAX_EMAIL_ATTEMPTS],
       );
 
+      const sentIds: string[] = [];
+
       await runWithConcurrency(
         result.rows,
         SEND_CONCURRENCY,
         async (notification) => {
           const sent = await this.sendNotificationEmail(notification);
           if (sent) {
+            sentIds.push(notification.id);
             metrics.increment('notificationsSent');
           } else if (notification.email_attempts >= MAX_EMAIL_ATTEMPTS) {
             logger.error(
@@ -62,6 +66,8 @@ class NotificationService {
           }
         },
       );
+
+      await this.markEmailed(sentIds);
       metrics.setProcessingTime();
     } catch (error) {
       logger.error({ err: error }, 'Failed to process notifications');
@@ -69,15 +75,39 @@ class NotificationService {
     }
   }
 
+  // emailed_on, not read_on: whether the user has read the notification is
+  // theirs to say, and writing read_on here also hid the email from anyone
+  // who happened to open the notification in-app first.
+  async markEmailed(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    try {
+      await pool.query(
+        'UPDATE notifications SET emailed_on = NOW() WHERE id = ANY($1::int[])',
+        [ids],
+      );
+    } catch (error) {
+      logger.error({ err: error, ids }, 'Failed to mark notifications emailed');
+      metrics.increment('notificationErrors');
+    }
+  }
+
   async sendNotificationEmail(
     notification: DatabaseNotification,
-    client?: PoolClient,
   ): Promise<boolean> {
-    const queryClient = client ?? pool;
     try {
       const emailData: NotificationEmailData = {
+        // The row's `data` jsonb carries the per-type fields the templates
+        // reference; the named fields below always win over it.
+        ...(notification.data ?? {}),
         userName: notification.login,
-        taskUrl: notification.link,
+        // Links are relative app paths, which an email client has no origin to
+        // resolve against.
+        taskUrl: notification.link
+          ? `${config.appBaseUrl}${notification.link}`
+          : config.appBaseUrl,
+        title: notification.title,
+        message: notification.message,
+        typeName: notification.type_name,
       };
 
       await emailService.sendEmailWithRetry(
@@ -87,15 +117,6 @@ class NotificationService {
         emailData,
       );
 
-      // emailed_on, not read_on: whether the user has read the notification is
-      // theirs to say, and writing read_on here also hid the email from anyone
-      // who happened to open the notification in-app first.
-      await queryClient.query(
-        `UPDATE notifications
-        SET emailed_on = NOW()
-        WHERE id = $1`,
-        [notification.id],
-      );
       return true;
     } catch (error) {
       logger.error(
@@ -123,26 +144,6 @@ class NotificationService {
         return 'projectUpdate';
       default:
         return 'default';
-    }
-  }
-
-  async generateNotification(
-    type: string,
-    userId: string,
-    data: Record<string, any>,
-  ): Promise<NotificationCreateResponse> {
-    try {
-      const result = await pool.query<NotificationCreateResponse>(
-        `INSERT INTO notifications (type_id, user_id, data, created_on)
-         VALUES ((SELECT id FROM notification_types WHERE name = $1), $2, $3, NOW())
-         RETURNING id, type_id, user_id, created_on`,
-        [type, userId, data],
-      );
-
-      return result.rows[0];
-    } catch (error) {
-      logger.error({ err: error }, 'Failed to generate notification');
-      throw error;
     }
   }
 }
