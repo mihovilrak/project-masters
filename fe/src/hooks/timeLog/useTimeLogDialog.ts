@@ -34,8 +34,7 @@ export const useTimeLogDialog = ({
   // Track if form has been initialized to prevent infinite loops
   const isInitialized = useRef(false);
 
-  const { timeError, validateTime, validateAndFormatTime } =
-    useTimeLogValidation();
+  const { timeError, validateAndFormatTime } = useTimeLogValidation();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const {
     projects,

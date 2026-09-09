@@ -68,7 +68,7 @@ describe('useTaskTimeLogs', () => {
     // await waitForNextUpdate();
 
     await waitFor(() => {
-      expect(getTaskTimeLogs).toHaveBeenCalledWith(1);
+      expect(getTaskTimeLogs).toHaveBeenCalledWith(1, expect.any(AbortSignal));
     });
     await waitFor(() => {
       expect(result.current.timeLogs).toEqual(mockTimeLogs);

@@ -3,7 +3,6 @@ import { render } from '@testing-library/react';
 import { Profiler } from 'react';
 import { TestWrapper } from '../../TestWrapper';
 import Layout from '../../../components/Layout/Layout';
-import Header from '../../../components/Layout/Header';
 import { User } from '../../../types/user';
 import AuthProvider from '../../../context/AuthContext';
 
@@ -99,21 +98,4 @@ describe('Layout Components Performance', () => {
     });
   });
 
-  describe('Header', () => {
-    it('renders efficiently with default configuration', () => {
-      render(measurePerformance(Header));
-    });
-
-    it('renders efficiently when scrolled', () => {
-      // Mock window scroll event
-      global.scrollY = 100;
-      window.dispatchEvent(new Event('scroll'));
-
-      render(measurePerformance(Header));
-
-      // Reset scroll position
-      global.scrollY = 0;
-      window.dispatchEvent(new Event('scroll'));
-    });
-  });
 });

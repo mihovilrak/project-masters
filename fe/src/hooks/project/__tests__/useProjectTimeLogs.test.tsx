@@ -80,7 +80,6 @@ describe('useProjectTimeLogs', () => {
     expect(getTaskTimeLogs).toHaveBeenCalledTimes(2);
     expect(getTaskTimeLogs).toHaveBeenCalledWith(1);
     expect(getTaskTimeLogs).toHaveBeenCalledWith(2);
-    console.log('DEBUG timeLogs:', result.current.timeLogs);
     expect(result.current.timeLogs).toEqual(
       expect.arrayContaining(mockTimeLogs),
     );
@@ -88,6 +87,28 @@ describe('useProjectTimeLogs', () => {
       expect.arrayContaining(result.current.timeLogs),
     );
     expect(result.current.timeLogs).toHaveLength(mockTimeLogs.length);
+  });
+
+  it('loads task time logs in parallel', async () => {
+    let activeRequests = 0;
+    let maxActiveRequests = 0;
+    (getTaskTimeLogs as jest.Mock).mockImplementation(
+      async (taskId: number) => {
+        activeRequests += 1;
+        maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        activeRequests -= 1;
+        return mockTimeLogs.filter((log) => log.task_id === taskId);
+      },
+    );
+    const { result } = renderHook(() => useProjectTimeLogs('1'));
+
+    await act(async () => {
+      await result.current.loadTimeLogs();
+    });
+
+    expect(maxActiveRequests).toBe(2);
+    expect(result.current.timeLogs).toEqual(mockTimeLogs);
   });
 
   it('should handle time log creation', async () => {

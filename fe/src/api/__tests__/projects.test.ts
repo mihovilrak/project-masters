@@ -83,7 +83,9 @@ describe('Projects API', () => {
 
       const result = await getProjectDetails(1);
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/projects/1/details');
+      expect(mockedApi.get).toHaveBeenCalledWith('/projects/1/details', {
+        signal: undefined,
+      });
       expect(result).toEqual(projectWithMembers);
     });
 
@@ -102,7 +104,9 @@ describe('Projects API', () => {
 
       const result = await getProjectById(1);
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/projects/1');
+      expect(mockedApi.get).toHaveBeenCalledWith('/projects/1', {
+        signal: undefined,
+      });
       expect(result).toEqual(mockProject);
     });
 
@@ -224,7 +228,9 @@ describe('Projects API', () => {
     it('should fetch members successfully', async () => {
       mockedApi.get.mockResolvedValueOnce({ data: [mockProjectMember] });
       const result = await getProjectMembers(1);
-      expect(mockedApi.get).toHaveBeenCalledWith('/projects/1/members');
+      expect(mockedApi.get).toHaveBeenCalledWith('/projects/1/members', {
+        signal: undefined,
+      });
       expect(result).toEqual([mockProjectMember]);
     });
   });
@@ -233,7 +239,9 @@ describe('Projects API', () => {
     it('should fetch statuses successfully', async () => {
       mockedApi.get.mockResolvedValueOnce({ data: [mockProjectStatus] });
       const result = await getProjectStatuses();
-      expect(mockedApi.get).toHaveBeenCalledWith('/projects/statuses');
+      expect(mockedApi.get).toHaveBeenCalledWith('/projects/statuses', {
+        signal: undefined,
+      });
       expect(result).toEqual([mockProjectStatus]);
     });
   });
@@ -303,7 +311,9 @@ describe('Projects API', () => {
 
       const result = await getSubprojects(1);
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/projects/1/subprojects');
+      expect(mockedApi.get).toHaveBeenCalledWith('/projects/1/subprojects', {
+        signal: undefined,
+      });
       expect(result).toEqual([mockProject]);
     });
 

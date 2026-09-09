@@ -142,8 +142,15 @@ describe('useProjectSelect', () => {
     const { result } = renderHook(() => useProjectSelect(1));
 
     await waitFor(() => {
-      expect(getProjectMembers).toHaveBeenCalledWith(1);
-      expect(getProjectTasks).toHaveBeenCalledWith(1);
+      expect(getProjectMembers).toHaveBeenCalledWith(
+        1,
+        expect.any(AbortSignal),
+      );
+      expect(getProjectTasks).toHaveBeenCalledWith(
+        1,
+        {},
+        expect.any(AbortSignal),
+      );
       expect(result.current.projectMembers).toEqual(mockProjectMembers);
       expect(result.current.projectTasks).toEqual(mockTasks);
     });
@@ -165,7 +172,7 @@ describe('useProjectSelect', () => {
 
     await waitFor(() => {
       expect(logger.error).toHaveBeenCalledWith(
-        'Error fetching projects:',
+        'Failed to load projects',
         error,
       );
       expect(result.current.projects).toEqual([]);
@@ -180,7 +187,7 @@ describe('useProjectSelect', () => {
 
     await waitFor(() => {
       expect(logger.error).toHaveBeenCalledWith(
-        'Error fetching project members:',
+        'Failed to load project members',
         error,
       );
       expect(result.current.projectMembers).toEqual([]);
@@ -196,7 +203,7 @@ describe('useProjectSelect', () => {
 
     await waitFor(() => {
       expect(logger.error).toHaveBeenCalledWith(
-        'Failed to fetch project tasks:',
+        'Failed to load project tasks',
         error,
       );
       expect(result.current.projectMembers).toEqual(mockProjectMembers);
@@ -260,8 +267,15 @@ describe('useProjectSelect', () => {
 
     rerender({ projectId: 2, taskId: null });
     await waitFor(() => {
-      expect(getProjectMembers).toHaveBeenCalledWith(2);
-      expect(getProjectTasks).toHaveBeenCalledWith(2);
+      expect(getProjectMembers).toHaveBeenCalledWith(
+        2,
+        expect.any(AbortSignal),
+      );
+      expect(getProjectTasks).toHaveBeenCalledWith(
+        2,
+        {},
+        expect.any(AbortSignal),
+      );
       expect(result.current.projectMembers).toEqual(newProjectMembers);
       expect(result.current.projectTasks).toEqual(newTasks);
     });

@@ -23,6 +23,7 @@ export const useTaskCore = (taskId: string) => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchTaskData = async () => {
       if (!taskId) return;
 
@@ -30,9 +31,9 @@ export const useTaskCore = (taskId: string) => {
         setState((prev) => ({ ...prev, loading: true, error: null }));
 
         const [taskData, subtasksData, statusesData] = await Promise.all([
-          getTaskById(Number(taskId)),
-          getSubtasks(Number(taskId)),
-          getTaskStatuses(),
+          getTaskById(Number(taskId), controller.signal),
+          getSubtasks(Number(taskId), controller.signal),
+          getTaskStatuses(controller.signal),
         ]);
 
         setState((prev) => ({
@@ -43,6 +44,7 @@ export const useTaskCore = (taskId: string) => {
           loading: false,
         }));
       } catch (error: unknown) {
+        if (controller.signal.aborted) return;
         logger.error('Error fetching task data:', error);
         setState((prev) => ({
           ...prev,
@@ -53,6 +55,7 @@ export const useTaskCore = (taskId: string) => {
     };
 
     fetchTaskData();
+    return () => controller.abort();
   }, [taskId]);
 
   const handleStatusChange = async (statusId: number) => {

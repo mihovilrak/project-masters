@@ -14,8 +14,11 @@ import ActivityTypesTable from './ActivityTypesTable';
 import RolesTable from './RolesTable';
 import { TypesAndRolesDialog } from './TypesAndRolesDialog';
 import { useTypesAndRoles } from '../../hooks/setting/useTypesAndRoles';
+import { usePermission } from '../../hooks/common/usePermission';
 
 const TypesAndRolesManager: React.FC = () => {
+  const { hasPermission: canManage, loading: permissionLoading } =
+    usePermission('Admin');
   const {
     state,
     handleTabChange,
@@ -44,6 +47,7 @@ const TypesAndRolesManager: React.FC = () => {
             onEdit={handleEdit}
             onDelete={handleDelete}
             loading={state.loading}
+            canManage={canManage}
           />
         );
       case 1:
@@ -53,6 +57,7 @@ const TypesAndRolesManager: React.FC = () => {
             onEdit={handleEdit}
             onDelete={handleDelete}
             loading={state.loading}
+            canManage={canManage}
           />
         );
       case 2:
@@ -62,6 +67,7 @@ const TypesAndRolesManager: React.FC = () => {
             onEdit={handleEdit}
             onDelete={handleDelete}
             loading={state.loading}
+            canManage={canManage}
           />
         );
       default:
@@ -90,6 +96,7 @@ const TypesAndRolesManager: React.FC = () => {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={handleCreate}
+          disabled={permissionLoading || !canManage}
         >
           {state.activeTab === 0 && 'Add Task Type'}
           {state.activeTab === 1 && 'Add Activity Type'}

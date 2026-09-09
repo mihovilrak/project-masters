@@ -20,10 +20,10 @@ const TaskTypesTable: React.FC<TaskTypesTableProps> = ({
   taskTypes: propTaskTypes,
   onEdit,
   loading: propLoading,
+  canManage = true,
 }) => {
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (propTaskTypes) {
@@ -90,7 +90,7 @@ const TaskTypesTable: React.FC<TaskTypesTableProps> = ({
                   <IconButton
                     onClick={() => type && onEdit(type)}
                     size="small"
-                    disabled={!type}
+                    disabled={!type || !canManage}
                     aria-label="Edit task type"
                   >
                     <EditIcon />

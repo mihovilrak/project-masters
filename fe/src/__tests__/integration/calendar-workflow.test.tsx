@@ -1,4 +1,3 @@
-// @ts-nocheck - MSW v1 handlers don't have perfect TypeScript support
 import React from 'react';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
@@ -11,9 +10,7 @@ import {
   defaultUser,
   defaultPermissions,
 } from '../mocks/handlers';
-
-// MSW v1 API
-const { rest } = require('msw');
+import { http, HttpResponse } from 'msw';
 
 describe('Calendar Integration Workflow', () => {
   beforeEach(() => {
@@ -65,9 +62,7 @@ describe('Calendar Integration Workflow', () => {
     it('should handle empty task data', async () => {
       // Override handler to return empty array
       server.use(
-        rest.get('/api/tasks/calendar', (req, res, ctx) => {
-          return res(ctx.json([]));
-        }),
+        http.get('/api/tasks/calendar', () => HttpResponse.json([])),
       );
 
       renderCalendar();
@@ -87,12 +82,9 @@ describe('Calendar Integration Workflow', () => {
     it('should handle API error when fetching tasks', async () => {
       // Override handler to return error
       server.use(
-        rest.get('/api/tasks/calendar', (req, res, ctx) => {
-          return res(
-            ctx.status(500),
-            ctx.json({ error: 'Internal server error' }),
-          );
-        }),
+        http.get('/api/tasks/calendar', () =>
+          HttpResponse.json({ error: 'Internal server error' }, { status: 500 }),
+        ),
       );
 
       renderCalendar();
@@ -296,9 +288,7 @@ describe('Calendar Integration Workflow', () => {
     it('should handle network errors gracefully', async () => {
       // Override handler to simulate network error
       server.use(
-        rest.get('/api/tasks/calendar', () => {
-          throw new Error('Network Error');
-        }),
+        http.get('/api/tasks/calendar', () => HttpResponse.error()),
       );
 
       renderCalendar();
@@ -318,9 +308,9 @@ describe('Calendar Integration Workflow', () => {
     it('should handle 404 errors', async () => {
       // Override handler to return 404
       server.use(
-        rest.get('/api/tasks/calendar', (req, res, ctx) => {
-          return res(ctx.status(404), ctx.json({ error: 'Not found' }));
-        }),
+        http.get('/api/tasks/calendar', () =>
+          HttpResponse.json({ error: 'Not found' }, { status: 404 }),
+        ),
       );
 
       renderCalendar();
@@ -342,14 +332,12 @@ describe('Calendar Integration Workflow', () => {
     it('should fetch tasks for correct date range when switching months', async () => {
       const user = userEvent.setup();
       let requestCount = 0;
-      let lastRequestParams: any = null;
 
       // Track API calls
       server.use(
-        rest.get('/api/tasks/calendar', (req, res, ctx) => {
+        http.get('/api/tasks/calendar', () => {
           requestCount++;
-          lastRequestParams = req.url.searchParams;
-          return res(ctx.json([defaultTask]));
+          return HttpResponse.json([defaultTask]);
         }),
       );
 

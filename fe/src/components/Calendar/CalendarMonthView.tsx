@@ -1,9 +1,9 @@
 import React from 'react';
-import { Box, Paper, Typography, Grid, Chip } from '@mui/material';
+import { Box, Paper, Typography, Grid } from '@mui/material';
 import { Task } from '../../types/task';
 import { CalendarViewProps } from '../../types/calendar';
-import { getPriorityColor } from '../../utils/taskUtils';
 import { useCalendarDays } from '../../hooks/calendar/useCalendarDays';
+import CalendarTaskChip from './CalendarTaskChip';
 
 const CalendarMonthView: React.FC<CalendarViewProps> = ({
   date,
@@ -55,24 +55,11 @@ const CalendarMonthView: React.FC<CalendarViewProps> = ({
               {day.tasks && day.tasks.length > 0 ? (
                 <>
                   {day.tasks.slice(0, 3).map((task: Task) => (
-                    <Chip
+                    <CalendarTaskChip
                       key={task?.id}
-                      label={task?.name || 'Unnamed Task'}
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (task?.id) {
-                          onTaskClick(task.id);
-                        }
-                      }}
-                      sx={{
-                        mb: 0.5,
-                        width: '100%',
-                        backgroundColor: getPriorityColor(
-                          task?.priority_name || '',
-                        ),
-                      }}
-                      data-testid={`task-chip-${task?.id}`}
+                      task={task}
+                      onClick={onTaskClick}
+                      compact
                     />
                   ))}
                   {day.tasks.length > 3 && (

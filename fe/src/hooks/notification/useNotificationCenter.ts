@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   getNotifications,
@@ -6,48 +6,45 @@ import {
   deleteNotification,
 } from '../../api/notifications';
 import { Notification } from '../../types/notification';
+import { useAsyncResource } from '../common/useAsyncResource';
 import logger from '../../utils/logger';
 import getApiErrorMessage from '../../utils/getApiErrorMessage';
+
+const EMPTY_NOTIFICATIONS: Notification[] = [];
 
 export const useNotificationCenter = (
   userId: number | undefined,
   pollIntervalMs: number = 60000,
 ) => {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [unreadCount, setUnreadCount] = useState<number>(0);
-  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const fetchNotifications = async (): Promise<void> => {
-    if (!userId) return;
+  const {
+    data: notifications,
+    loading,
+    error,
+    setError,
+    refetch: fetchNotifications,
+  } = useAsyncResource<Notification[]>(
+    async (signal) => (await getNotifications(signal)) || [],
+    [userId],
+    {
+      initialData: EMPTY_NOTIFICATIONS,
+      enabled: Boolean(userId),
+      errorMessage: 'Failed to load notifications',
+    },
+  );
 
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await getNotifications();
-      setNotifications(data || []);
-      setUnreadCount((data || []).filter((n) => !n?.is_read).length);
-    } catch (err: unknown) {
-      logger.error('Failed to fetch notifications:', err);
-      setNotifications([]);
-      setUnreadCount(0);
-      setError(getApiErrorMessage(err, 'Failed to load notifications'));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const unreadCount = useMemo(
+    () => notifications.filter((n) => !n?.is_read).length,
+    [notifications],
+  );
 
   useEffect(() => {
-    if (userId) {
-      fetchNotifications();
-      if (pollIntervalMs > 0) {
-        const interval = setInterval(fetchNotifications, pollIntervalMs);
-        return () => clearInterval(interval);
-      }
-    }
-  }, [userId, pollIntervalMs]);
+    if (!userId || pollIntervalMs <= 0) return;
+    const interval = setInterval(fetchNotifications, pollIntervalMs);
+    return () => clearInterval(interval);
+  }, [userId, pollIntervalMs, fetchNotifications]);
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>): void => {
     setAnchorEl(event.currentTarget);

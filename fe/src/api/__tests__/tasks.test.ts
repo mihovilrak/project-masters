@@ -68,7 +68,9 @@ describe('Tasks API', () => {
 
       const result = await getTasks(filters);
 
-      expect(mockedApi.get).toHaveBeenCalledWith(`/tasks?status=1&priority=2`);
+      expect(mockedApi.get).toHaveBeenCalledWith(`/tasks?status=1&priority=2`, {
+        signal: undefined,
+      });
       expect(result).toEqual([mockTask]);
     });
 
@@ -78,6 +80,16 @@ describe('Tasks API', () => {
 
       await expect(getTasks()).rejects.toThrow(error);
     });
+
+    it('keeps numeric zero values and omits empty filters', async () => {
+      mockedApi.get.mockResolvedValueOnce({ data: [] });
+
+      await getTasks({ status_id: 0, search: '' });
+
+      expect(mockedApi.get).toHaveBeenCalledWith('/tasks?status_id=0', {
+        signal: undefined,
+      });
+    });
   });
 
   describe('getTaskById', () => {
@@ -86,7 +98,9 @@ describe('Tasks API', () => {
 
       const result = await getTaskById(1);
 
-      expect(mockedApi.get).toHaveBeenCalledWith(`/tasks/1`);
+      expect(mockedApi.get).toHaveBeenCalledWith(`/tasks/1`, {
+        signal: undefined,
+      });
       expect(result).toEqual(mockTask);
     });
 
@@ -143,6 +157,7 @@ describe('Tasks API', () => {
 
       expect(mockedApi.get).toHaveBeenCalledWith(
         `/projects/${projectId}/tasks?status=1`,
+        { signal: undefined },
       );
       expect(result).toEqual([mockTask]);
     });
@@ -201,7 +216,9 @@ describe('Tasks API', () => {
 
       const result = await getTaskStatuses();
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/tasks/statuses');
+      expect(mockedApi.get).toHaveBeenCalledWith('/tasks/statuses', {
+        signal: undefined,
+      });
       expect(result).toEqual(mockStatuses);
     });
   });
@@ -235,7 +252,10 @@ describe('Tasks API', () => {
 
       const result = await getSubtasks(parentId);
 
-      expect(mockedApi.get).toHaveBeenCalledWith(`/tasks/${parentId}/subtasks`);
+      expect(mockedApi.get).toHaveBeenCalledWith(
+        `/tasks/${parentId}/subtasks`,
+        { signal: undefined },
+      );
       expect(result).toEqual([mockTask]);
     });
   });
@@ -261,7 +281,9 @@ describe('Tasks API', () => {
 
       const result = await getActiveTasks();
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/tasks/active');
+      expect(mockedApi.get).toHaveBeenCalledWith('/tasks/active', {
+        signal: undefined,
+      });
       expect(result).toEqual([mockTask]);
     });
   });
@@ -283,7 +305,9 @@ describe('Tasks API', () => {
 
       const result = await getPriorities();
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/tasks/priorities');
+      expect(mockedApi.get).toHaveBeenCalledWith('/tasks/priorities', {
+        signal: undefined,
+      });
       expect(result).toEqual(mockPriorities);
     });
 

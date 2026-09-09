@@ -16,16 +16,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import { TimeLogListProps } from '../../types/timeLog';
 import PermissionButton from '../common/PermissionButton';
 import { formatDate } from '../../utils/dateUtils';
-
-const formatTime = (hours: number | string): string => {
-  const numHours = typeof hours === 'string' ? parseFloat(hours) : hours;
-  if (typeof numHours !== 'number' || isNaN(numHours)) {
-    return '0:00';
-  }
-  const wholeHours = Math.floor(numHours);
-  const minutes = Math.round((numHours - wholeHours) * 60);
-  return `${wholeHours}:${minutes.toString().padStart(2, '0')}`;
-};
+import { formatHoursClock } from '../../utils/timeUtils';
 
 const TimeLogList: React.FC<TimeLogListProps> = ({
   timeLogs,
@@ -76,7 +67,7 @@ const TimeLogList: React.FC<TimeLogListProps> = ({
             >
               <TableCell sx={{ whiteSpace: 'nowrap' }}>#{log.id}</TableCell>
               <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                {formatTime(log?.spent_time || 0)} h
+                {formatHoursClock(log?.spent_time || 0)} h
               </TableCell>
               <TableCell>
                 <Chip

@@ -6,141 +6,32 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import TaskForm from '../TaskForm';
 import { useAuth } from '../../../context/AuthContext';
 import { useTaskForm } from '../../../hooks/task/useTaskForm';
-import { TaskFormState } from '../../../types/task';
+import { SimpleChangeEvent, TaskFormState } from '../../../types/task';
 
-// Mock all dependencies
 jest.mock('../../../context/AuthContext');
 jest.mock('../../../hooks/task/useTaskForm');
 
-// Mock child components
+// Children that fetch on mount or render pickers are stubbed; the plain
+// fields TaskForm renders itself are asserted through their real markup.
 jest.mock('../TagSelect', () => ({
   __esModule: true,
-  TagSelect: () => <div data-testid="tag-select" />,
+  default: () => <div data-testid="tag-select" />,
+}));
+jest.mock('../TaskTypeSelect', () => ({
+  __esModule: true,
+  default: () => <div data-testid="task-type" />,
 }));
 jest.mock('../Form/DatePickerSection', () => ({
-  DatePickerSection: ({ handleChange }: any) => (
-    <div data-testid="date-picker-section" />
-  ),
+  DatePickerSection: () => <div data-testid="date-picker-section" />,
 }));
 jest.mock('../Form/AssigneeSelectionSection', () => ({
-  AssigneeSelectionSection: ({ handleChange }: any) => (
+  AssigneeSelectionSection: () => (
     <div data-testid="assignee-selection-section" />
   ),
 }));
 jest.mock('../Form/ParentTaskSelect', () => ({
-  ParentTaskSelect: ({ handleChange }: any) => (
-    <div data-testid="parent-task-select" />
-  ),
+  ParentTaskSelect: () => <div data-testid="parent-task-select" />,
 }));
-jest.mock('../Form/TaskTagsSection', () => ({
-  TaskTagsSection: ({ handleChange }: any) => (
-    <div data-testid="task-tags-section" />
-  ),
-}));
-
-jest.mock('../Form/TaskFormActionButtons', () => ({
-  TaskFormActionButtons: ({ handleChange }: any) => (
-    <div data-testid="task-form-action-buttons" />
-  ),
-}));
-jest.mock('../Form/TaskNameField', () => ({
-  TaskNameField: ({ handleChange, formData }: any) => (
-    <input
-      data-testid="task-name"
-      name="name"
-      value={formData?.name || ''}
-      onChange={handleChange}
-    />
-  ),
-}));
-
-jest.mock('../Form/TaskDescriptionField', () => ({
-  TaskDescriptionField: ({ handleChange, formData }: any) => (
-    <textarea
-      data-testid="task-description"
-      name="description"
-      value={formData?.description || ''}
-      onChange={handleChange}
-    />
-  ),
-}));
-//
-
-//
-jest.mock('../Form/TaskPrioritySelect', () => ({
-  TaskPrioritySelect: ({ handleChange, formData }: any) => (
-    <select
-      data-testid="task-priority"
-      name="priority_id"
-      value={formData?.priority_id || ''}
-      onChange={handleChange}
-    >
-      <option value="">Select Priority</option>
-      <option value="1">High</option>
-      <option value="2">Medium</option>
-      <option value="3">Low</option>
-    </select>
-  ),
-}));
-
-jest.mock('../Form/TaskStatusSelect', () => ({
-  TaskStatusSelect: ({ handleChange, formData }: any) => (
-    <select
-      data-testid="task-status"
-      name="status_id"
-      value={formData?.status_id || ''}
-      onChange={handleChange}
-    >
-      <option value="">Select Status</option>
-      <option value="1">Open</option>
-      <option value="2">In Progress</option>
-      <option value="3">Done</option>
-    </select>
-  ),
-}));
-
-jest.mock('../Form/TaskTypeSection', () => ({
-  TaskTypeSection: ({ handleChange, formData }: any) => (
-    <select
-      data-testid="task-type"
-      name="type_id"
-      value={formData?.type_id || ''}
-      onChange={handleChange}
-    >
-      <option value="">Select Type</option>
-      <option value="1">Feature</option>
-      <option value="2">Bug</option>
-      <option value="3">Chore</option>
-    </select>
-  ),
-}));
-
-jest.mock('../Form/TaskProgressField', () => ({
-  // Render if value !== undefined && value !== null
-  TaskProgressField: (props: any) => {
-    const { handleChange, value } = props;
-    return value !== undefined && value !== null ? (
-      <input
-        data-testid="task-progress"
-        name="progress"
-        value={value}
-        onChange={handleChange}
-      />
-    ) : null;
-  },
-}));
-
-jest.mock('../Form/EstimatedTimeField', () => ({
-  EstimatedTimeField: ({ handleChange, formData }: any) => (
-    <input
-      data-testid="estimated-time"
-      name="estimated_time"
-      value={formData?.estimated_time || ''}
-      onChange={handleChange}
-    />
-  ),
-}));
-
 jest.mock('../ProjectSelect', () => ({
   ProjectSelect: ({ handleChange, formData }: any) => (
     <select
@@ -160,7 +51,6 @@ jest.mock('../ProjectSelect', () => ({
 describe('TaskForm', () => {
   const mockHandleChange = jest.fn();
   const mockHandleSubmit = jest.fn();
-  const mockNavigate = jest.fn();
 
   const defaultFormData: TaskFormState = {
     name: '',
@@ -216,10 +106,29 @@ describe('TaskForm', () => {
   it('renders create task form correctly', () => {
     renderTaskForm();
 
-    expect(screen.getByText('Create Task')).toBeInTheDocument();
-    expect(screen.getByTestId('task-name')).toBeInTheDocument();
-    expect(screen.getByTestId('task-description')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Create Task' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Name/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Description/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Estimated Time/)).toBeInTheDocument();
     expect(screen.getByTestId('project-select')).toBeInTheDocument();
+    expect(screen.getByTestId('date-picker-section')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('assignee-selection-section'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('tag-select')).toBeInTheDocument();
+    expect(screen.getByTestId('task-type')).toBeInTheDocument();
+    expect(
+      screen.getByRole('combobox', { name: /Priority/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('combobox', { name: /Status/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Create Task' }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('cancel-button')).toBeInTheDocument();
   });
 
   it('shows loading state when isLoading is true', () => {
@@ -240,6 +149,29 @@ describe('TaskForm', () => {
 
     renderTaskForm('/tasks/1');
     expect(screen.getByText('Edit Task')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Update Task' }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders the select error when the hook reports one', () => {
+    (useTaskForm as jest.Mock).mockReturnValue({
+      ...mockTaskFormHook,
+      selectError: 'Could not load projects',
+    });
+
+    renderTaskForm();
+    expect(screen.getByText('Could not load projects')).toBeInTheDocument();
+  });
+
+  it('shows the name validation error from the hook', () => {
+    (useTaskForm as jest.Mock).mockReturnValue({
+      ...mockTaskFormHook,
+      fieldErrors: { name: 'Name is required' },
+    });
+
+    renderTaskForm();
+    expect(screen.getByText('Name is required')).toBeInTheDocument();
   });
 
   it('handles form submission correctly', async () => {
@@ -274,13 +206,30 @@ describe('TaskForm', () => {
   });
 
   it('shows progress field only when editing', () => {
+    const { unmount } = renderTaskForm('/tasks/new');
+    expect(screen.queryByLabelText(/^Progress/)).not.toBeInTheDocument();
+    unmount();
+
     (useTaskForm as jest.Mock).mockReturnValue({
       ...mockTaskFormHook,
-      isEditing: false,
-      formData: { ...mockTaskFormHook.formData, progress: undefined },
+      isEditing: true,
+      formData: { ...defaultFormData, progress: 40 },
     });
-    renderTaskForm('/tasks/new');
-    expect(screen.queryByTestId('task-progress')).not.toBeInTheDocument();
+    renderTaskForm('/tasks/1');
+    expect(screen.getByLabelText(/^Progress/)).toHaveValue(40);
+  });
+
+  it('renders the parent task select only once a project is chosen', () => {
+    const { unmount } = renderTaskForm();
+    expect(screen.queryByTestId('parent-task-select')).not.toBeInTheDocument();
+    unmount();
+
+    (useTaskForm as jest.Mock).mockReturnValue({
+      ...mockTaskFormHook,
+      formData: { ...defaultFormData, project_id: 123 },
+    });
+    renderTaskForm();
+    expect(screen.getByTestId('parent-task-select')).toBeInTheDocument();
   });
 
   it('prevents project and parent task changes when IDs come from URL', () => {
@@ -297,29 +246,30 @@ describe('TaskForm', () => {
   });
 
   it('handles form field changes correctly', () => {
-    // Set up so that after change, formData reflects the new value
-    (useTaskForm as jest.Mock).mockReturnValue({
-      ...mockTaskFormHook,
-      formData: { ...mockTaskFormHook.formData },
+    // The field is controlled, so React resets the DOM node before the
+    // assertions run; read the event while the handler is on the stack.
+    const seen: { name?: string; value?: unknown } = {};
+    mockHandleChange.mockImplementation((e: SimpleChangeEvent) => {
+      seen.name = e.target.name;
+      seen.value = e.target.value;
     });
+
     const { unmount } = renderTaskForm();
 
-    const taskName = screen.getByTestId('task-name');
-    fireEvent.change(taskName, {
-      target: { name: 'name', value: 'New Task' },
+    fireEvent.change(screen.getByLabelText(/^Name/), {
+      target: { value: 'New Task' },
     });
-    // Assert on event passed to mockHandleChange
+
     expect(mockHandleChange).toHaveBeenCalled();
-    const callArg = mockHandleChange.mock.calls[0][0];
-    expect(callArg.target.name).toBe('name');
-    // Simulate formData update and re-render
+    expect(seen.name).toBe('name');
+    expect(seen.value).toBe('New Task');
+
     (useTaskForm as jest.Mock).mockReturnValue({
       ...mockTaskFormHook,
-      formData: { ...mockTaskFormHook.formData, name: 'New Task' },
+      formData: { ...defaultFormData, name: 'New Task' },
     });
     unmount();
     renderTaskForm();
-    // Assert input value is updated in the DOM
-    expect(screen.getByTestId('task-name')).toHaveValue('New Task');
+    expect(screen.getByLabelText(/^Name/)).toHaveValue('New Task');
   });
 });

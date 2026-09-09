@@ -1,29 +1,22 @@
 import { api } from './api';
-import { ActivityType } from '../types/timeLog';
-import logger from '../utils/logger';
+import { ActivityType } from '../types/setting';
 
 // Get activity types
-export const getActivityTypes = async (): Promise<ActivityType[]> => {
-  try {
-    const response = await api.get('/admin/activity-types');
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to fetch activity types', error);
-    throw error;
-  }
+export const getActivityTypes = async (
+  signal?: AbortSignal,
+): Promise<ActivityType[]> => {
+  const response = await api.get<ActivityType[]>('/admin/activity-types', {
+    signal,
+  });
+  return response.data;
 };
 
 // Create activity type
 export const createActivityType = async (
   data: Partial<ActivityType>,
 ): Promise<ActivityType> => {
-  try {
-    const response = await api.post('/admin/activity-types', data);
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to create activity type', error);
-    throw error;
-  }
+  const response = await api.post<ActivityType>('/admin/activity-types', data);
+  return response.data;
 };
 
 // Update activity type
@@ -31,32 +24,24 @@ export const updateActivityType = async (
   id: number,
   data: Partial<ActivityType>,
 ): Promise<ActivityType> => {
-  try {
-    const response = await api.put(`/admin/activity-types/${id}`, data);
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to update activity type', error);
-    throw error;
-  }
+  const response = await api.put<ActivityType>(
+    `/admin/activity-types/${id}`,
+    data,
+  );
+  return response.data;
 };
 
 // Delete activity type
 export const deleteActivityType = async (id: number): Promise<void> => {
-  try {
-    await api.delete(`/admin/activity-types/${id}`);
-  } catch (error) {
-    logger.error('Failed to delete activity type', error);
-    throw error;
-  }
+  await api.delete<void>(`/admin/activity-types/${id}`);
 };
 
 // Get available icons
-export const getAvailableIcons = async (): Promise<string[]> => {
-  try {
-    const response = await api.get('/admin/activity-types/icons');
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to fetch available icons', error);
-    throw error;
-  }
+export const getAvailableIcons = async (
+  signal?: AbortSignal,
+): Promise<string[]> => {
+  const response = await api.get<string[]>('/admin/activity-types/icons', {
+    signal,
+  });
+  return response.data;
 };

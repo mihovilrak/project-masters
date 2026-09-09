@@ -16,7 +16,38 @@ describe('logger sanitizeForLog', () => {
     expect(result.authorization).toBe('[REDACTED]');
   });
 
-  it('returns non-objects as-is', () => {
+  it('redacts secrets in pre-stringified payloads', () => {
+    const result = sanitizeForLog(
+      JSON.stringify({ login: 'john', password: 'secret123' }),
+    );
+
+    expect(result).toBe('{"login":"john","password":"[REDACTED]"}');
+  });
+
+  it('redacts authorization values in plain strings', () => {
+    expect(sanitizeForLog('Authorization: Bearer abc.def')).toBe(
+      'Authorization: [REDACTED]',
+    );
+  });
+
+  it('handles circular objects', () => {
+    const input: Record<string, unknown> = { name: 'root' };
+    input.self = input;
+
+    expect(sanitizeForLog(input)).toEqual({
+      name: 'root',
+      self: '[Circular]',
+    });
+  });
+
+  it('caps traversal depth', () => {
+    const input = { a: { b: { c: { d: { e: { f: { g: 'deep' } } } } } } };
+    const result = sanitizeForLog(input) as Record<string, any>;
+
+    expect(result.a.b.c.d.e.f).toBe('[Max Depth]');
+  });
+
+  it('returns safe non-string primitives as-is', () => {
     expect(sanitizeForLog('hello')).toBe('hello');
     expect(sanitizeForLog(42)).toBe(42);
     expect(sanitizeForLog(null)).toBe(null);

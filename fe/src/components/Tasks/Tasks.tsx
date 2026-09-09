@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { FixedSizeList as List } from 'react-window';
 import {
   getTasks,
@@ -12,35 +12,26 @@ import { getProjects } from '../../api/projects';
 import { getUsers } from '../../api/users';
 import {
   Button,
-  Card,
-  CardContent,
   Typography,
   Box,
   CircularProgress,
-  Chip,
   Select,
   MenuItem,
   SelectChangeEvent,
   Grid,
   IconButton,
   Tooltip,
-  LinearProgress,
 } from '@mui/material';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import GridViewIcon from '@mui/icons-material/GridView';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
 import FilterPanel from '../common/FilterPanel';
 import { usePermission } from '../../hooks/common/usePermission';
 import DeleteConfirmDialog from '../common/DeleteConfirmDialog';
-import { Task } from '../../types/task';
+import { Task, TaskFilters } from '../../types/task';
 import { FilterValues, FilterOption } from '../../types/filterPanel';
-import {
-  chipPropsForPriority,
-  chipPropsForStatus,
-} from '../../utils/taskUtils';
+import { idFilterParam, parseIdFilter } from '../../utils/taskUtils';
 import getApiErrorMessage from '../../utils/getApiErrorMessage';
-import { formatDate } from '../../utils/dateUtils';
+import TaskCard from './TaskCard';
 
 const Tasks: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -73,7 +64,7 @@ const Tasks: React.FC = () => {
         const statusId = statusIdStr !== '' ? Number(statusIdStr) : undefined;
         const hasFilters =
           currentFilters && Object.keys(currentFilters).length > 0;
-        const params: Record<string, string | number> = {};
+        const params: TaskFilters = {};
         if (hasFilters && currentFilters) {
           if (statusId === -1) {
             params.inactive_statuses_only = 1;
@@ -84,26 +75,16 @@ const Tasks: React.FC = () => {
           } else if (statusId !== undefined && !Number.isNaN(statusId)) {
             params.status_id = statusId;
           }
-          if (f.priority_id != null && f.priority_id !== '') {
-            const p = String(f.priority_id);
-            params.priority_id = p.includes(',') ? p : Number(f.priority_id);
-          }
-          if (f.assignee_id != null && f.assignee_id !== '') {
-            const a = String(f.assignee_id);
-            params.assignee_id = a.includes(',') ? a : Number(f.assignee_id);
-          }
-          if (f.holder_id != null && f.holder_id !== '') {
-            const h = String(f.holder_id);
-            params.holder_id = h.includes(',') ? h : Number(f.holder_id);
-          }
-          if (f.project_id != null && f.project_id !== '') {
-            const pr = String(f.project_id);
-            params.project_id = pr.includes(',') ? pr : Number(f.project_id);
-          }
-          if (f.created_by != null && f.created_by !== '') {
-            const c = String(f.created_by);
-            params.created_by = c.includes(',') ? c : Number(f.created_by);
-          }
+          const priorityParam = idFilterParam(f.priority_id);
+          if (priorityParam !== undefined) params.priority_id = priorityParam;
+          const assigneeParam = idFilterParam(f.assignee_id);
+          if (assigneeParam !== undefined) params.assignee_id = assigneeParam;
+          const holderParam = idFilterParam(f.holder_id);
+          if (holderParam !== undefined) params.holder_id = holderParam;
+          const projectParam = idFilterParam(f.project_id);
+          if (projectParam !== undefined) params.project_id = projectParam;
+          const createdByParam = idFilterParam(f.created_by);
+          if (createdByParam !== undefined) params.created_by = createdByParam;
           if (f.id != null && f.id !== '') params.id = Number(f.id);
           if (f.parent_id != null && f.parent_id !== '')
             params.parent_id = Number(f.parent_id);
@@ -245,91 +226,31 @@ const Tasks: React.FC = () => {
           if (!matchesSearch) return false;
         }
 
-        let statusIds =
-          filters.status_id != null && String(filters.status_id).includes(',')
-            ? String(filters.status_id)
-                .split(',')
-                .map((s) => Number(s.trim()))
-                .filter((n) => !Number.isNaN(n))
-            : filters.status_id != null && filters.status_id !== ''
-              ? [Number(filters.status_id)]
-              : null;
+        let statusIds = parseIdFilter(filters.status_id);
         // "Active" (id 0): API already returned only active tasks; don't filter by status_id client-side
-        if (
-          statusIds &&
-          statusIds.length > 0 &&
-          statusIds.every((id) => id === 0)
-        )
+        if (statusIds?.length && statusIds.every((id) => id === 0))
           statusIds = null;
-        if (
-          statusIds &&
-          statusIds.length > 0 &&
-          !statusIds.includes(task.status_id)
-        )
+        if (statusIds?.length && !statusIds.includes(task.status_id))
           return false;
 
-        const priorityIds =
-          filters.priority_id != null &&
-          String(filters.priority_id).includes(',')
-            ? String(filters.priority_id)
-                .split(',')
-                .map((s) => Number(s.trim()))
-                .filter((n) => !Number.isNaN(n))
-            : filters.priority_id != null && filters.priority_id !== ''
-              ? [Number(filters.priority_id)]
-              : null;
-        if (
-          priorityIds &&
-          priorityIds.length > 0 &&
-          !priorityIds.includes(task.priority_id)
-        )
+        const priorityIds = parseIdFilter(filters.priority_id);
+        if (priorityIds?.length && !priorityIds.includes(task.priority_id))
           return false;
 
-        const projectIds =
-          filters.project_id != null && String(filters.project_id).includes(',')
-            ? String(filters.project_id)
-                .split(',')
-                .map((s) => Number(s.trim()))
-                .filter((n) => !Number.isNaN(n))
-            : filters.project_id != null && filters.project_id !== ''
-              ? [Number(filters.project_id)]
-              : null;
-        if (
-          projectIds &&
-          projectIds.length > 0 &&
-          !projectIds.includes(task.project_id ?? 0)
-        )
+        const projectIds = parseIdFilter(filters.project_id);
+        if (projectIds?.length && !projectIds.includes(task.project_id ?? 0))
           return false;
 
-        const assigneeIds =
-          filters.assignee_id != null &&
-          String(filters.assignee_id).includes(',')
-            ? String(filters.assignee_id)
-                .split(',')
-                .map((s) => Number(s.trim()))
-                .filter((n) => !Number.isNaN(n))
-            : filters.assignee_id != null && filters.assignee_id !== ''
-              ? [Number(filters.assignee_id)]
-              : null;
+        const assigneeIds = parseIdFilter(filters.assignee_id);
         if (
-          assigneeIds &&
-          assigneeIds.length > 0 &&
+          assigneeIds?.length &&
           (task.assignee_id == null || !assigneeIds.includes(task.assignee_id))
         )
           return false;
 
-        const holderIds =
-          filters.holder_id != null && String(filters.holder_id).includes(',')
-            ? String(filters.holder_id)
-                .split(',')
-                .map((s) => Number(s.trim()))
-                .filter((n) => !Number.isNaN(n))
-            : filters.holder_id != null && filters.holder_id !== ''
-              ? [Number(filters.holder_id)]
-              : null;
+        const holderIds = parseIdFilter(filters.holder_id);
         if (
-          holderIds &&
-          holderIds.length > 0 &&
+          holderIds?.length &&
           (task.holder_id == null || !holderIds.includes(task.holder_id))
         )
           return false;
@@ -446,163 +367,15 @@ const Tasks: React.FC = () => {
           <Grid container spacing={2}>
             {tasksInPreOrder.map(({ task, depth }) => (
               <Grid size={{ xs: 12, sm: 6, md: 4 }} key={task?.id}>
-                <Card>
-                  <CardContent
-                    sx={{
-                      py: 1.5,
-                      '&:last-child': { pb: 1.5 },
-                      pl: 1 + depth * 2,
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        alignItems: 'center',
-                        gap: 0.5,
-                        mb: 0.5,
-                      }}
-                    >
-                      <Typography variant="body2" color="text.secondary">
-                        #{task?.id}
-                      </Typography>
-                      <Typography
-                        component={Link}
-                        to={`/tasks/${task?.id}`}
-                        variant="h6"
-                        sx={{
-                          fontWeight: 600,
-                          textDecoration: 'none',
-                          color: 'inherit',
-                          '&:hover': { textDecoration: 'underline' },
-                          flex: '1 1 auto',
-                        }}
-                      >
-                        {task?.name || 'Unnamed Task'}
-                      </Typography>
-                      {(canEditTask || canDeleteTask) && (
-                        <Box sx={{ display: 'flex', gap: 0 }}>
-                          {canEditTask && (
-                            <Tooltip title="Edit">
-                              <IconButton
-                                size="small"
-                                onClick={() =>
-                                  navigate(`/tasks/${task?.id}/edit`)
-                                }
-                                aria-label="Edit task"
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {canDeleteTask && (
-                            <Tooltip title="Delete">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => handleDeleteClick(task)}
-                                aria-label="Delete task"
-                                data-testid="delete-task-icon"
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </Box>
-                      )}
-                    </Box>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: 0.5,
-                        mb: 0.5,
-                      }}
-                    >
-                      <Chip
-                        label={task?.status_name || 'Unknown'}
-                        size="small"
-                        data-testid="status-chip"
-                        {...chipPropsForStatus(
-                          task?.status_name,
-                          task?.status_color,
-                        )}
-                      />
-                      <Chip
-                        label={task?.priority_name || 'Unknown'}
-                        size="small"
-                        data-testid="priority-chip"
-                        {...chipPropsForPriority(
-                          task?.priority_name,
-                          task?.priority_color,
-                        )}
-                      />
-                    </Box>
-                    <Box sx={{ mt: 0.5, fontSize: '0.875rem' }}>
-                      <Box
-                        sx={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 1fr 1fr',
-                          gap: '2px 16px',
-                          alignItems: 'start',
-                        }}
-                      >
-                        <Box>
-                          <strong>Holder</strong>{' '}
-                          {task?.holder_id ? (
-                            <Link to={`/users/${task.holder_id}`}>
-                              {task?.holder_name || 'User'}
-                            </Link>
-                          ) : (
-                            '—'
-                          )}
-                        </Box>
-                        <Box>
-                          <strong>Start</strong>{' '}
-                          {task?.start_date ? formatDate(task.start_date) : '—'}
-                        </Box>
-                        <Box>
-                          <strong>Project</strong>{' '}
-                          {task?.project_id ? (
-                            <Link to={`/projects/${task.project_id}`}>
-                              {task?.project_name || 'Project'}
-                            </Link>
-                          ) : (
-                            'No Project'
-                          )}
-                        </Box>
-                        <Box>
-                          <strong>Assignee</strong>{' '}
-                          {task?.assignee_id ? (
-                            <Link to={`/users/${task.assignee_id}`}>
-                              {task?.assignee_name || 'User'}
-                            </Link>
-                          ) : (
-                            'Unassigned'
-                          )}
-                        </Box>
-                        <Box>
-                          <strong>Due</strong>{' '}
-                          {task?.due_date ? formatDate(task.due_date) : '—'}
-                        </Box>
-                        <Box />
-                      </Box>
-                      <Box sx={{ mt: 0.5 }}>
-                        <Typography variant="caption">
-                          <strong>Progress</strong>
-                        </Typography>
-                        <LinearProgress
-                          variant="determinate"
-                          value={task?.progress ?? 0}
-                          sx={{ mt: 0.25, height: 6, borderRadius: 1 }}
-                        />
-                        <Typography variant="caption">
-                          {task?.progress ?? 0}%
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </CardContent>
-                </Card>
+                <TaskCard
+                  task={task}
+                  depth={depth}
+                  variant="grid"
+                  canEdit={canEditTask}
+                  canDelete={canDeleteTask}
+                  onEdit={(t) => navigate(`/tasks/${t?.id}/edit`)}
+                  onDelete={handleDeleteClick}
+                />
               </Grid>
             ))}
           </Grid>
@@ -620,166 +393,15 @@ const Tasks: React.FC = () => {
                 return (
                   <div style={style}>
                     <Box sx={{ py: 0.5, px: 0.5 }}>
-                      <Card>
-                        <CardContent
-                          sx={{
-                            py: 1.5,
-                            '&:last-child': { pb: 1.5 },
-                            pl: 1 + depth * 2,
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              flexWrap: 'wrap',
-                              alignItems: 'center',
-                              gap: 0.5,
-                              mb: 0.5,
-                            }}
-                          >
-                            <Typography variant="body2" color="text.secondary">
-                              #{task?.id}
-                            </Typography>
-                            <Typography
-                              component={Link}
-                              to={`/tasks/${task?.id}`}
-                              variant="h6"
-                              sx={{
-                                fontWeight: 600,
-                                textDecoration: 'none',
-                                color: 'inherit',
-                                '&:hover': { textDecoration: 'underline' },
-                                flex: '1 1 auto',
-                              }}
-                            >
-                              {task?.name || 'Unnamed Task'}
-                            </Typography>
-                            {(canEditTask || canDeleteTask) && (
-                              <Box sx={{ display: 'flex', gap: 0 }}>
-                                {canEditTask && (
-                                  <Tooltip title="Edit">
-                                    <IconButton
-                                      size="small"
-                                      onClick={() =>
-                                        navigate(`/tasks/${task?.id}/edit`)
-                                      }
-                                      aria-label="Edit task"
-                                    >
-                                      <EditIcon fontSize="small" />
-                                    </IconButton>
-                                  </Tooltip>
-                                )}
-                                {canDeleteTask && (
-                                  <Tooltip title="Delete">
-                                    <IconButton
-                                      size="small"
-                                      color="error"
-                                      onClick={() => handleDeleteClick(task)}
-                                      aria-label="Delete task"
-                                      data-testid="delete-task-icon"
-                                    >
-                                      <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                  </Tooltip>
-                                )}
-                              </Box>
-                            )}
-                          </Box>
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              flexWrap: 'wrap',
-                              gap: 0.5,
-                              mb: 0.5,
-                            }}
-                          >
-                            <Chip
-                              label={task?.status_name || 'Unknown'}
-                              size="small"
-                              data-testid="status-chip"
-                              {...chipPropsForStatus(
-                                task?.status_name,
-                                task?.status_color,
-                              )}
-                            />
-                            <Chip
-                              label={task?.priority_name || 'Unknown'}
-                              size="small"
-                              data-testid="priority-chip"
-                              {...chipPropsForPriority(
-                                task?.priority_name,
-                                task?.priority_color,
-                              )}
-                            />
-                          </Box>
-                          <Box sx={{ mt: 0.5, fontSize: '0.875rem' }}>
-                            <Box
-                              sx={{
-                                display: 'flex',
-                                flexWrap: 'wrap',
-                                gap: 1.5,
-                                alignItems: 'center',
-                              }}
-                            >
-                              <span>
-                                <strong>Holder</strong>{' '}
-                                {task?.holder_id ? (
-                                  <Link to={`/users/${task.holder_id}`}>
-                                    {task?.holder_name || 'User'}
-                                  </Link>
-                                ) : (
-                                  '—'
-                                )}
-                              </span>
-                              <span>
-                                <strong>Assignee</strong>{' '}
-                                {task?.assignee_id ? (
-                                  <Link to={`/users/${task.assignee_id}`}>
-                                    {task?.assignee_name || 'User'}
-                                  </Link>
-                                ) : (
-                                  'Unassigned'
-                                )}
-                              </span>
-                              <span>
-                                <strong>Start</strong>{' '}
-                                {task?.start_date
-                                  ? formatDate(task.start_date)
-                                  : '—'}
-                              </span>
-                              <span>
-                                <strong>Due</strong>{' '}
-                                {task?.due_date
-                                  ? formatDate(task.due_date)
-                                  : '—'}
-                              </span>
-                              <span>
-                                <strong>Project</strong>{' '}
-                                {task?.project_id ? (
-                                  <Link to={`/projects/${task.project_id}`}>
-                                    {task?.project_name || 'Project'}
-                                  </Link>
-                                ) : (
-                                  'No Project'
-                                )}
-                              </span>
-                            </Box>
-                            <Box sx={{ mt: 0.5 }}>
-                              <Typography variant="caption">
-                                <strong>Progress</strong>
-                              </Typography>
-                              <LinearProgress
-                                variant="determinate"
-                                value={task?.progress ?? 0}
-                                sx={{ mt: 0.25, height: 6, borderRadius: 1 }}
-                              />
-                              <Typography variant="caption">
-                                {task?.progress ?? 0}%
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </CardContent>
-                      </Card>
+                      <TaskCard
+                        task={task}
+                        depth={depth}
+                        variant="list"
+                        canEdit={canEditTask}
+                        canDelete={canDeleteTask}
+                        onEdit={(t) => navigate(`/tasks/${t?.id}/edit`)}
+                        onDelete={handleDeleteClick}
+                      />
                     </Box>
                   </div>
                 );

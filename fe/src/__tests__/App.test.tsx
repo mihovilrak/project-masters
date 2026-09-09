@@ -83,11 +83,6 @@ jest.mock('../hooks/app/useAppRoutes', () => ({
   useTaskTimeLogsWrapper: () => ({
     task: null,
   }),
-  useAppState: () => ({
-    taskFormOpen: false,
-    handleTaskCreated: jest.fn(),
-    handleTaskFormClose: jest.fn(),
-  }),
 }));
 
 jest.mock('../context/AuthContext', () => ({

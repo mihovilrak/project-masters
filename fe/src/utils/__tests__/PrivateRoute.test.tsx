@@ -4,7 +4,7 @@ import PrivateRoute from '../PrivateRoute';
 import { useAuth } from '../../context/AuthContext';
 import { Navigate, Outlet } from 'react-router-dom';
 import { User } from '../../types/user';
-import { Permission } from '../../types/auth';
+import { UserPermission } from '../../types/auth';
 
 // Mock dependencies
 jest.mock('../../context/AuthContext');
@@ -20,7 +20,7 @@ jest.mock('@mui/material', () => ({
 describe('PrivateRoute', () => {
   const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 
-  const mockPermission: Permission = {
+  const mockPermission: UserPermission = {
     permission: 'Admin',
   };
 

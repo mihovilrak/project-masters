@@ -36,13 +36,14 @@ export const useProjectDetails = (projectId: string) => {
   const timeLogHooks = useProjectTimeLogs(projectId);
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchProjectData = async () => {
       try {
         setState((prev) => ({ ...prev, loading: true, error: null }));
 
         const [projectData, projectDetails] = await Promise.all([
-          getProjectById(Number(projectId)),
-          getProjectDetails(Number(projectId)),
+          getProjectById(Number(projectId), controller.signal),
+          getProjectDetails(Number(projectId), controller.signal),
         ]);
 
         // Check if project was found
@@ -83,6 +84,7 @@ export const useProjectDetails = (projectId: string) => {
           logger.error('Error loading project sub-data:', hookError);
         }
       } catch (error: unknown) {
+        if (controller.signal.aborted) return;
         logger.error('Error fetching project data:', error);
         setState((prev) => ({
           ...prev,
@@ -95,6 +97,7 @@ export const useProjectDetails = (projectId: string) => {
     if (projectId) {
       fetchProjectData();
     }
+    return () => controller.abort();
   }, [projectId]);
 
   const handleProjectUpdate = useCallback(

@@ -21,7 +21,7 @@ export const useActivityTypeDialog = (
         color: activityType.color,
         description: activityType.description || '',
         active: activityType.active,
-        icon: activityType.icon,
+        icon: activityType.icon ?? undefined,
       });
     } else {
       setFormData({

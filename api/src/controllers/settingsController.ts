@@ -198,6 +198,15 @@ function getEnvFilePath(): string {
   return process.env.ENV_FILE_PATH || path.join(process.cwd(), '.env');
 }
 
+// The container filesystem is read-only apart from mounted volumes, so the
+// settings file's directory may not exist on first write.
+function ensureEnvFileDir(filePath: string): void {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
 function readEnvFile(filePath: string): Record<string, string> {
   const out: Record<string, string> = {};
   if (!fs.existsSync(filePath)) return out;
@@ -249,6 +258,7 @@ function writeEnvFile(filePath: string, updates: Record<string, string>): void {
     updatedLines.push(`${key}=${formatEnvValue(value)}`);
   }
 
+  ensureEnvFileDir(filePath);
   fs.writeFileSync(
     filePath,
     updatedLines.join(newline) + (updatedLines.length ? newline : ''),

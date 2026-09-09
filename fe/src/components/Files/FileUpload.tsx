@@ -3,6 +3,7 @@ import { Button, Box, LinearProgress, Typography, Alert } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { useFileUpload } from '../../hooks/file/useFileUpload';
 import { FileUploadProps } from '../../types/file';
+import { UPLOAD_ACCEPT } from '../../constants/uploads';
 
 const FileUpload: React.FC<FileUploadProps> = ({ taskId, onFileUploaded }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -21,7 +22,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ taskId, onFileUploaded }) => {
         onChange={handleFileChange}
         style={{ display: 'none' }}
         data-testid="file-input"
-        accept="*/*"
+        accept={UPLOAD_ACCEPT}
       />
       <Button
         variant="contained"

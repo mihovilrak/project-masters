@@ -21,33 +21,18 @@ export default (pool: Pool): Router => {
   // A task is only reachable through the project it belongs to.
   const taskAccess = requireTaskAccess(pool);
 
+  // Literal paths are registered before '/:id' so a typo 404s instead of being
+  // swallowed by the id route and reaching getTaskById with a non-numeric id.
   router.get('/', withPool(pool, taskController.getTasks));
   router.get('/statuses', withPool(pool, taskController.getTaskStatuses));
   router.get('/priorities', withPool(pool, taskController.getPriorities));
   router.get('/active', withPool(pool, taskController.getActiveTasks));
-  router.get('/:id', taskAccess, withPool(pool, taskController.getTaskById));
+  router.get('/calendar', withPool(pool, taskController.getTasksByDateRange));
   router.post(
     '/',
     checkPermission(pool, 'Create tasks'),
     requireProjectAccess(pool, 'project_id'),
     withPool(pool, taskController.createTask),
-  );
-  router.put(
-    '/:id',
-    checkPermission(pool, 'Edit tasks'),
-    taskAccess,
-    withPool(pool, taskController.updateTask),
-  );
-  router.delete(
-    '/:id',
-    checkPermission(pool, 'Delete tasks'),
-    taskAccess,
-    withPool(pool, taskController.deleteTask),
-  );
-  router.get(
-    '/:id/subtasks',
-    taskAccess,
-    withPool(pool, taskController.getSubtasks),
   );
 
   router.use(
@@ -70,16 +55,10 @@ export default (pool: Pool): Router => {
     fileRouter(pool),
   );
 
-  router.patch(
-    '/:id',
-    checkPermission(pool, 'Edit tasks'),
+  router.get(
+    '/:id/subtasks',
     taskAccess,
-    withPool(pool, taskController.updateTask),
-  );
-  router.patch(
-    '/:id/change-status',
-    taskAccess,
-    withPool(pool, taskController.changeTaskStatus),
+    withPool(pool, taskController.getSubtasks),
   );
   router.get('/:id/tags', taskAccess, withPool(pool, getTaskTags));
   router.post('/:id/tags', taskAccess, withPool(pool, addTaskTags));
@@ -98,6 +77,37 @@ export default (pool: Pool): Router => {
     '/:id/watchers/:userId',
     taskAccess,
     withPool(pool, watcherController.removeTaskWatcher),
+  );
+  router.patch(
+    '/:id/dates',
+    checkPermission(pool, 'Edit tasks'),
+    taskAccess,
+    withPool(pool, taskController.updateTaskDates),
+  );
+  router.patch(
+    '/:id/change-status',
+    taskAccess,
+    withPool(pool, taskController.changeTaskStatus),
+  );
+
+  router.get('/:id', taskAccess, withPool(pool, taskController.getTaskById));
+  router.put(
+    '/:id',
+    checkPermission(pool, 'Edit tasks'),
+    taskAccess,
+    withPool(pool, taskController.updateTask),
+  );
+  router.patch(
+    '/:id',
+    checkPermission(pool, 'Edit tasks'),
+    taskAccess,
+    withPool(pool, taskController.updateTask),
+  );
+  router.delete(
+    '/:id',
+    checkPermission(pool, 'Delete tasks'),
+    taskAccess,
+    withPool(pool, taskController.deleteTask),
   );
 
   return router;

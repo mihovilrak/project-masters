@@ -1,4 +1,4 @@
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { useAssigneeSelect } from '../useAssigneeSelect';
 import { getProjectMembers } from '../../../api/projects';
 import { ProjectMember } from '../../../types/project';
@@ -36,7 +36,10 @@ describe('useAssigneeSelect', () => {
     const { result } = renderHook(() => useAssigneeSelect(1));
 
     await waitFor(() => {
-      expect(getProjectMembers).toHaveBeenCalledWith(1);
+      expect(getProjectMembers).toHaveBeenCalledWith(
+        1,
+        expect.any(AbortSignal),
+      );
       expect(result.current.projectMembers).toEqual(mockProjectMembers);
     });
   });
@@ -55,9 +58,12 @@ describe('useAssigneeSelect', () => {
     const { result } = renderHook(() => useAssigneeSelect(1));
 
     await waitFor(() => {
-      expect(getProjectMembers).toHaveBeenCalledWith(1);
+      expect(getProjectMembers).toHaveBeenCalledWith(
+        1,
+        expect.any(AbortSignal),
+      );
       expect(logger.error).toHaveBeenCalledWith(
-        'Error fetching project members:',
+        'Failed to load project members',
         error,
       );
       expect(result.current.projectMembers).toEqual([]);
@@ -78,7 +84,10 @@ describe('useAssigneeSelect', () => {
 
     rerender(2);
     await waitFor(() => {
-      expect(getProjectMembers).toHaveBeenCalledWith(2);
+      expect(getProjectMembers).toHaveBeenCalledWith(
+        2,
+        expect.any(AbortSignal),
+      );
       expect(result.current.projectMembers).toEqual([mockProjectMembers[1]]);
     });
   });

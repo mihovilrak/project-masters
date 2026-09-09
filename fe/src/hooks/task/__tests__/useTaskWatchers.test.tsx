@@ -37,7 +37,7 @@ describe('useTaskWatchers', () => {
     // await waitForNextUpdate();
 
     await waitFor(() => {
-      expect(getTaskWatchers).toHaveBeenCalledWith(1);
+      expect(getTaskWatchers).toHaveBeenCalledWith(1, expect.any(AbortSignal));
     });
     await waitFor(() => {
       expect(result.current.watchers).toEqual(mockWatchers);
@@ -132,7 +132,7 @@ describe('useTaskWatchers', () => {
     });
 
     await waitFor(() => {
-      expect(getTaskWatchers).toHaveBeenCalledWith(1);
+      expect(getTaskWatchers).toHaveBeenCalledWith(1, expect.any(AbortSignal));
     });
   });
 });

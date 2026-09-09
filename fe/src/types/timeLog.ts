@@ -2,6 +2,9 @@ import { Dayjs } from 'dayjs';
 import { Project } from './project';
 import { Task } from './task';
 import { User } from './user';
+import { ActivityType } from './setting';
+
+export type { ActivityType } from './setting';
 
 export interface TimeLog {
   id: number;
@@ -29,17 +32,6 @@ export interface TimeLogCreate {
   log_date: string;
   spent_time: number;
   description?: string;
-}
-
-export interface ActivityType {
-  id: number;
-  name: string;
-  description: string | null;
-  color: string;
-  icon: string | null;
-  active: boolean;
-  created_on: string;
-  updated_on: string | null;
 }
 
 export interface TimeSpent {

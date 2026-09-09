@@ -1,27 +1,20 @@
 import { User } from './user';
 import { Role } from './role';
+import { Permission } from './admin';
+import { TaskType } from './task';
+
+export type { Permission } from './admin';
+export type { TaskType } from './task';
 
 export interface ActivityType {
   id: number;
   name: string;
   color: string;
-  icon?: string;
-  description?: string;
+  icon?: string | null;
+  description?: string | null;
   active: boolean;
-}
-
-export interface TaskType {
-  id: number;
-  name: string;
-  color: string;
-  icon?: string;
-  description?: string;
-  active: boolean;
-}
-
-export interface Permission {
-  id: number;
-  name: string;
+  created_on?: string;
+  updated_on?: string | null;
 }
 
 export interface ActivityTypeDialogProps {
@@ -43,6 +36,7 @@ export interface ActivityTypesTableProps {
   onEdit: (activityType: ActivityType) => void;
   onDelete: (id: number) => Promise<void>;
   loading?: boolean;
+  canManage?: boolean;
 }
 
 export interface TaskTypesTableProps {
@@ -50,6 +44,7 @@ export interface TaskTypesTableProps {
   onEdit: (taskType: TaskType) => void;
   onDelete: (id: number) => Promise<void>;
   loading?: boolean;
+  canManage?: boolean;
 }
 
 export interface SystemSettingsState {
@@ -89,24 +84,6 @@ export interface TimezoneOption {
   utcOffsetSeconds: number;
   isDst: boolean;
   label: string;
-}
-
-export interface Notification {
-  id: number;
-  type: string;
-  title: string;
-  message: string;
-  read: boolean;
-  created_on: string;
-  link?: string;
-  metadata?: Record<string, any>;
-}
-
-export interface TaskTypeSelectProps {
-  value: number | string;
-  onChange: (event: React.ChangeEvent<{ value: unknown }>) => void;
-  error?: boolean;
-  required?: boolean;
 }
 
 export interface UserTableProps {

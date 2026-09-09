@@ -36,39 +36,23 @@ export const useTaskTimeLogsWrapper = () => {
   const { id } = useParams<{ id: string }>();
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchTask = async () => {
       if (id) {
         try {
           setError(null);
-          const taskData = await getTaskById(parseInt(id));
+          const taskData = await getTaskById(parseInt(id), controller.signal);
           setTask(taskData);
         } catch (err) {
+          if (controller.signal.aborted) return;
           logger.error('Failed to fetch task:', err);
           setError(getApiErrorMessage(err, 'Failed to load task'));
         }
       }
     };
     fetchTask();
+    return () => controller.abort();
   }, [id]);
 
   return { task, error };
-};
-
-export const useAppState = () => {
-  const [taskFormOpen, setTaskFormOpen] = useState(false);
-
-  const handleTaskCreated = async (task: Task) => {
-    setTaskFormOpen(false);
-  };
-
-  const handleTaskFormClose = () => {
-    setTaskFormOpen(false);
-  };
-
-  return {
-    taskFormOpen,
-    setTaskFormOpen,
-    handleTaskCreated,
-    handleTaskFormClose,
-  };
 };

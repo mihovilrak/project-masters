@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import FileUpload from '../FileUpload';
 import { useFileUpload } from '../../../hooks/file/useFileUpload';
+import { UPLOAD_ACCEPT } from '../../../constants/uploads';
 
 // Mock the useFileUpload hook
 jest.mock('../../../hooks/file/useFileUpload');
@@ -38,6 +39,7 @@ describe('FileUpload', () => {
     renderFileUpload();
     const fileInput = screen.getByTestId('file-input');
     expect(fileInput).toHaveStyle({ display: 'none' });
+    expect(fileInput).toHaveAttribute('accept', UPLOAD_ACCEPT);
   });
 
   it('clicks file input when upload button is clicked', () => {

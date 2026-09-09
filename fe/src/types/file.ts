@@ -46,8 +46,3 @@ export interface FileUploadOptions {
   onUploadProgress?: (progressEvent: AxiosProgressEvent) => void;
   params?: Record<string, string>;
 }
-
-export interface FileUploadProps {
-  taskId: number;
-  onFileUploaded: (file: TaskFile) => void;
-}

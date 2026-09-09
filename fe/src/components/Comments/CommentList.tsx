@@ -48,9 +48,9 @@ const CommentList: React.FC<CommentListProps> = ({
   return (
     <>
       <List>
-        {comments.map((comment) => (
+        {comments.map((comment, index) => (
           <Paper
-            key={comment?.id || Math.random()}
+            key={comment?.id ?? `comment-${index}`}
             elevation={0}
             sx={{ mb: 2, p: 2, backgroundColor: 'background.default' }}
           >

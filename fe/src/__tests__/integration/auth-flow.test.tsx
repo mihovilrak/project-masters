@@ -1,4 +1,3 @@
-// @ts-nocheck - MSW v1 handlers don't have perfect TypeScript support
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -6,9 +5,7 @@ import Login from '../../components/Auth/Login';
 import { TestWrapper } from '../TestWrapper';
 import { server } from '../mocks/server';
 import { defaultUser, defaultPermissions } from '../mocks/handlers';
-
-// MSW v1 API
-const { rest } = require('msw');
+import { http, HttpResponse } from 'msw';
 
 describe('Authentication Flow', () => {
   beforeEach(() => {
@@ -21,12 +18,18 @@ describe('Authentication Flow', () => {
 
     // Override login handler for successful login
     server.use(
-      rest.post('/api/login', async (req, res, ctx) => {
-        const body = (await req.json()) as { login: string; password: string };
+      http.post('/api/login', async ({ request }) => {
+        const body = (await request.json()) as {
+          login: string;
+          password: string;
+        };
         if (body.login === 'testuser' && body.password === 'password123') {
-          return res(ctx.json({ user: defaultUser }));
+          return HttpResponse.json({ user: defaultUser });
         }
-        return res(ctx.status(401), ctx.json({ error: 'Invalid credentials' }));
+        return HttpResponse.json(
+          { error: 'Invalid credentials' },
+          { status: 401 },
+        );
       }),
     );
 
@@ -67,9 +70,9 @@ describe('Authentication Flow', () => {
 
     // Override login handler to return 401
     server.use(
-      rest.post('/api/login', (req, res, ctx) => {
-        return res(ctx.status(401), ctx.json({ error: 'Invalid credentials' }));
-      }),
+      http.post('/api/login', () =>
+        HttpResponse.json({ error: 'Invalid credentials' }, { status: 401 }),
+      ),
     );
 
     render(
@@ -148,9 +151,7 @@ describe('Authentication Flow', () => {
 
     // Override login handler to simulate network error
     server.use(
-      rest.post('/api/login', () => {
-        throw new Error('Network Error');
-      }),
+      http.post('/api/login', () => HttpResponse.error()),
     );
 
     render(
@@ -183,12 +184,9 @@ describe('Authentication Flow', () => {
 
     // Override login handler to return 500
     server.use(
-      rest.post('/api/login', (req, res, ctx) => {
-        return res(
-          ctx.status(500),
-          ctx.json({ error: 'Internal server error' }),
-        );
-      }),
+      http.post('/api/login', () =>
+        HttpResponse.json({ error: 'Internal server error' }, { status: 500 }),
+      ),
     );
 
     render(

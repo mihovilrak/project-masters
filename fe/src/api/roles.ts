@@ -1,27 +1,16 @@
 import { api } from './api';
 import { Role } from '../types/role';
-import logger from '../utils/logger';
 
 // Get roles with permissions
-export const getRoles = async (): Promise<Role[]> => {
-  try {
-    const response = await api.get('/roles');
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to fetch roles', error);
-    throw error;
-  }
+export const getRoles = async (signal?: AbortSignal): Promise<Role[]> => {
+  const response = await api.get<Role[]>('/roles', { signal });
+  return response.data;
 };
 
 // Create role
 export const createRole = async (roleData: Partial<Role>): Promise<Role> => {
-  try {
-    const response = await api.post('/roles', roleData);
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to create role', error);
-    throw error;
-  }
+  const response = await api.post<Role>('/roles', roleData);
+  return response.data;
 };
 
 // Update role
@@ -29,21 +18,11 @@ export const updateRole = async (
   id: number,
   roleData: Partial<Role>,
 ): Promise<Role> => {
-  try {
-    const response = await api.put(`/roles/${id}`, roleData);
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to update role', error);
-    throw error;
-  }
+  const response = await api.put<Role>(`/roles/${id}`, roleData);
+  return response.data;
 };
 
 // Delete role
 export const deleteRole = async (id: number): Promise<void> => {
-  try {
-    await api.delete(`/roles/${id}`);
-  } catch (error) {
-    logger.error('Failed to delete role', error);
-    throw error;
-  }
+  await api.delete<void>(`/roles/${id}`);
 };

@@ -51,19 +51,7 @@ export interface UserUpdate {
   status_id?: number;
 }
 
-export interface PasswordChange {
-  current_password: string;
-  new_password: string;
-  confirm_password: string;
-}
-
-export interface ProfileUpdate {
-  name?: string;
-  surname?: string;
-  email?: string;
-}
-
-export interface FormData {
+export interface UserFormData {
   login: string;
   name: string;
   surname: string;

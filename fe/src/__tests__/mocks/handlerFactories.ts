@@ -1,6 +1,10 @@
-// @ts-nocheck - MSW v1 handlers don't have perfect TypeScript support
-// MSW v1 API - use rest handlers
-const { rest } = require('msw');
+import {
+  http,
+  HttpResponse,
+  delay as mswDelay,
+  JsonBodyType,
+  RequestHandler,
+} from 'msw';
 
 /**
  * Factory functions for creating MSW handlers
@@ -8,78 +12,70 @@ const { rest } = require('msw');
 
 export interface HandlerConfig {
   url: string;
-  data?: any;
+  data?: JsonBodyType;
   status?: number;
   delay?: number;
 }
+
+const maybeDelay = async (ms?: number): Promise<void> => {
+  if (ms) await mswDelay(ms);
+};
 
 /**
  * Create a GET handler
  */
 export const createGetHandler = (
   url: string,
-  data: any,
+  data: JsonBodyType,
   status: number = 200,
   delay?: number,
-) => {
-  return rest.get(url, async (req, res, ctx) => {
-    if (delay) {
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-    return res(ctx.status(status), ctx.json(data));
+): RequestHandler =>
+  http.get(url, async () => {
+    await maybeDelay(delay);
+    return HttpResponse.json(data, { status });
   });
-};
 
 /**
  * Create a POST handler
  */
 export const createPostHandler = (
   url: string,
-  responseData: any,
+  responseData: JsonBodyType,
   status: number = 200,
   delay?: number,
-) => {
-  return rest.post(url, async (req, res, ctx) => {
-    if (delay) {
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-    return res(ctx.status(status), ctx.json(responseData));
+): RequestHandler =>
+  http.post(url, async () => {
+    await maybeDelay(delay);
+    return HttpResponse.json(responseData, { status });
   });
-};
 
 /**
  * Create a PUT handler
  */
 export const createPutHandler = (
   url: string,
-  responseData: any,
+  responseData: JsonBodyType,
   status: number = 200,
   delay?: number,
-) => {
-  return rest.put(url, async (req, res, ctx) => {
-    if (delay) {
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-    return res(ctx.status(status), ctx.json(responseData));
+): RequestHandler =>
+  http.put(url, async () => {
+    await maybeDelay(delay);
+    return HttpResponse.json(responseData, { status });
   });
-};
 
 /**
  * Create a PATCH handler
  */
 export const createPatchHandler = (
   url: string,
-  responseData: any,
+  responseData: JsonBodyType,
   status: number = 200,
   delay?: number,
-) => {
-  return rest.patch(url, async (req, res, ctx) => {
-    if (delay) {
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-    return res(ctx.status(status), ctx.json(responseData));
+): RequestHandler =>
+  http.patch(url, async () => {
+    await maybeDelay(delay);
+    return HttpResponse.json(responseData, { status });
   });
-};
 
 /**
  * Create a DELETE handler
@@ -88,14 +84,11 @@ export const createDeleteHandler = (
   url: string,
   status: number = 200,
   delay?: number,
-) => {
-  return rest.delete(url, async (req, res, ctx) => {
-    if (delay) {
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-    return res(ctx.status(status), ctx.json({}));
+): RequestHandler =>
+  http.delete(url, async () => {
+    await maybeDelay(delay);
+    return HttpResponse.json({}, { status });
   });
-};
 
 /**
  * Create an error handler
@@ -105,21 +98,15 @@ export const createErrorHandler = (
   status: number,
   error: string | { error: string },
   delay?: number,
-) => {
-  return rest.all(url, async (req, res, ctx) => {
-    if (delay) {
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
+): RequestHandler =>
+  http.all(url, async () => {
+    await maybeDelay(delay);
     const errorMessage = typeof error === 'string' ? error : error.error;
-    return res(ctx.status(status), ctx.json({ error: errorMessage }));
+    return HttpResponse.json({ error: errorMessage }, { status });
   });
-};
 
 /**
  * Create a network error handler (simulates network failure)
  */
-export const createNetworkErrorHandler = (url: string) => {
-  return rest.all(url, () => {
-    throw new Error('Network Error');
-  });
-};
+export const createNetworkErrorHandler = (url: string): RequestHandler =>
+  http.all(url, () => HttpResponse.error());

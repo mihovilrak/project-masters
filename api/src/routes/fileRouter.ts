@@ -9,9 +9,8 @@ import { requireTaskAccessBy } from '../middleware/projectAccessMiddleware';
 import * as fileController from '../controllers/fileController';
 import { withPool } from '../utils/withPool';
 import { uploadFileFilter } from '../utils/uploadFilter';
+import { UPLOADS_DIR as uploadsDir } from '../utils/uploadsDir';
 
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, '../../uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }

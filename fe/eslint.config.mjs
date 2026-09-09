@@ -10,20 +10,28 @@ export default [
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['**/*.tsx', '**/*.ts'],
+    files: ['**/*.{ts,tsx}'],
     ...react.configs.flat.recommended,
-    ...react.configs.flat['jsx-runtime'],
-    ...reactHooks.configs.flat.recommended,
+    settings: { react: { version: 'detect' } },
+  },
+  { files: ['**/*.{ts,tsx}'], ...react.configs.flat['jsx-runtime'] },
+  { files: ['**/*.{ts,tsx}'], ...reactHooks.configs.flat.recommended },
+  {
+    files: ['**/*.{ts,tsx}'],
     rules: {
       'react/prop-types': 'off',
-      // Relax strict rules so existing codebase passes; re-enable and fix over time
+      'react-hooks/set-state-in-effect': 'warn',
       '@typescript-eslint/no-require-imports': 'off',
       '@typescript-eslint/ban-ts-comment': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/no-unsafe-function-type': 'off',
     },
-    settings: { react: { version: 'detect' } },
+  },
+  {
+    // Inline mock components in tests are anonymous by design.
+    files: ['**/__tests__/**', '**/*.{test,spec}.{ts,tsx}'],
+    rules: { 'react/display-name': 'off' },
   },
   {
     linterOptions: {

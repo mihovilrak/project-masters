@@ -23,52 +23,43 @@ export const useTimeLogData = ({
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        setIsLoading(true);
-        setLoadError(null);
-        const [activityTypesData] = await Promise.all([getActivityTypes()]);
-        setActivityTypes(activityTypesData);
-      } catch (err) {
-        logger.error('Error loading data:', err);
-        setLoadError(getApiErrorMessage(err, 'Failed to load activity types'));
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (open) {
-      loadInitialData();
+    if (!open) {
+      setIsLoading(false);
+      return;
     }
-  }, [open]);
 
-  useEffect(() => {
-    const loadProjectsAndTasks = async () => {
+    let active = true;
+    const loadData = async () => {
       try {
         setIsLoading(true);
         setLoadError(null);
-        const [projectsData] = await Promise.all([getProjects()]);
+        const [activityTypesData, projectsData, usersData, projectTasks] =
+          await Promise.all([
+            getActivityTypes(),
+            getProjects(),
+            hasAdminPermission ? getUsers() : Promise.resolve([]),
+            projectId ? getProjectTasks(projectId) : Promise.resolve([]),
+          ]);
+        if (!active) return;
+
+        setActivityTypes(activityTypesData);
         setProjects(projectsData);
-
-        if (hasAdminPermission) {
-          const usersData = await getUsers();
-          setUsers(usersData);
-        }
-
-        if (projectId) {
-          const projectTasks = await getProjectTasks(projectId);
-          setTasks(projectTasks);
-        }
+        setUsers(usersData);
+        setTasks(projectTasks);
       } catch (err) {
-        logger.error('Error loading projects and tasks:', err);
-        setLoadError(getApiErrorMessage(err, 'Failed to load projects and tasks'));
+        if (!active) return;
+        logger.error('Error loading time log data:', err);
+        setLoadError(getApiErrorMessage(err, 'Failed to load time log data'));
       } finally {
-        setIsLoading(false);
+        if (active) setIsLoading(false);
       }
     };
 
-    loadProjectsAndTasks();
-  }, [projectId, hasAdminPermission]);
+    loadData();
+    return () => {
+      active = false;
+    };
+  }, [open, projectId, hasAdminPermission]);
 
   const handleProjectSelect = async (projectId: number | null) => {
     if (projectId !== null) {

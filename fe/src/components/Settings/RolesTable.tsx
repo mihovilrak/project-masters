@@ -21,6 +21,7 @@ const RolesTable: React.FC<RolesTableProps> = ({
   onEdit,
   onDelete,
   loading,
+  canManage = true,
 }) => {
   if (loading) {
     return (
@@ -72,6 +73,7 @@ const RolesTable: React.FC<RolesTableProps> = ({
                   onClick={() => onEdit(role)}
                   size="small"
                   aria-label="Edit role"
+                  disabled={!canManage}
                 >
                   <EditIcon />
                 </IconButton>
@@ -81,6 +83,7 @@ const RolesTable: React.FC<RolesTableProps> = ({
                     size="small"
                     color="error"
                     aria-label="Delete role"
+                    disabled={!canManage}
                   >
                     <DeleteIcon />
                   </IconButton>

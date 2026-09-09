@@ -81,8 +81,8 @@ describe('useProjectDetails', () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
-    expect(getProjectById).toHaveBeenCalledWith(1);
-    expect(getProjectDetails).toHaveBeenCalledWith(1);
+    expect(getProjectById).toHaveBeenCalledWith(1, expect.any(AbortSignal));
+    expect(getProjectDetails).toHaveBeenCalledWith(1, expect.any(AbortSignal));
     expect(result.current.project).toEqual(mockProject);
     expect(result.current.projectDetails).toEqual(mockProject);
     expect(result.current.loading).toBe(false);

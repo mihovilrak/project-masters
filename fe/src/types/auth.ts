@@ -1,6 +1,6 @@
 import { User } from './user';
 
-export interface Permission {
+export interface UserPermission {
   permission: string;
 }
 
@@ -11,7 +11,7 @@ export interface LoginRequest {
 
 export interface AuthContextType {
   currentUser: User | null;
-  userPermissions: Permission[];
+  userPermissions: UserPermission[];
   permissionsLoading: boolean;
   error: string | null;
   login: (login: string, password: string) => Promise<boolean>;

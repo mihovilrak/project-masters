@@ -165,6 +165,56 @@ export const getTasks = async (
   }
 };
 
+/** Parse an ISO date/datetime query param into a `YYYY-MM-DD` string, or null. */
+const parseDateParam = (value: unknown): string | null => {
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const parsed = new Date(value);
+  if (isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
+};
+
+// Get tasks overlapping a date range (calendar view)
+export const getTasksByDateRange = async (
+  req: Request,
+  res: Response,
+  pool: Pool,
+): Promise<void> => {
+  try {
+    const userId = (req as CustomRequest).session?.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    const startDate = parseDateParam(req.query.start_date);
+    const endDate = parseDateParam(req.query.end_date);
+    if (!startDate || !endDate) {
+      res
+        .status(400)
+        .json({ error: 'start_date and end_date must be valid dates' });
+      return;
+    }
+    if (endDate < startDate) {
+      res
+        .status(400)
+        .json({ error: 'end_date must be on or after start_date' });
+      return;
+    }
+
+    const scopeUserId = await resolveProjectScope(pool, userId);
+    const tasks = await taskModel.getTasksByDateRange(
+      pool,
+      startDate,
+      endDate,
+      scopeUserId,
+    );
+    res.status(200).json(tasks);
+  } catch (error) {
+    logger.error({ err: error }, 'Error fetching tasks by date range');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 // Get Task by ID
 export const getTaskById = async (
   req: Request,
@@ -482,6 +532,80 @@ export const changeTaskStatus = async (
     res.status(200).json(task);
   } catch (error) {
     logger.error({ err: error }, 'Error changing task status');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Update only a task's start/due dates (Gantt drag-to-reschedule)
+export const updateTaskDates = async (
+  req: CustomRequest,
+  res: Response,
+  pool: Pool,
+): Promise<void> => {
+  const { id } = req.params;
+  const userId = req.session.user?.id;
+  const { start_date, due_date } = req.body ?? {};
+
+  if (start_date === undefined && due_date === undefined) {
+    res
+      .status(400)
+      .json({ error: 'At least one of start_date or due_date is required' });
+    return;
+  }
+
+  const dates: TaskUpdateInput = {};
+  for (const [key, value] of Object.entries({ start_date, due_date })) {
+    if (value === undefined) continue;
+    const timestamp = toTimestamp(value as Date | string);
+    if (isNaN(timestamp)) {
+      res.status(400).json({ error: `${key} must be a valid date` });
+      return;
+    }
+    (dates as Record<string, Date>)[key] = new Date(timestamp);
+  }
+
+  try {
+    const existing = await taskModel.getTaskById(pool, id);
+    if (!existing) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+
+    // A partial update must still be ordered against the date it is not changing.
+    const nextStart = dates.start_date ?? existing.start_date;
+    const nextDue = dates.due_date ?? existing.due_date;
+    if (
+      nextStart != null &&
+      nextDue != null &&
+      new Date(nextDue).getTime() < new Date(nextStart).getTime()
+    ) {
+      res.status(400).json({ error: 'Due date must be on or after start date' });
+      return;
+    }
+
+    const task = await withTransaction(pool, async (client) => {
+      const updated = await taskModel.updateTask(client, id, dates);
+      if (!updated) {
+        return null;
+      }
+
+      await notificationModel.createWatcherNotifications(client, {
+        task_id: parseInt(id),
+        action_user_id: parseInt(userId!),
+        type_id: NotificationType.TaskUpdated,
+      });
+
+      return updated;
+    });
+
+    if (!task) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+
+    res.status(200).json(task);
+  } catch (error) {
+    logger.error({ err: error }, 'Error updating task dates');
     res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -9,7 +9,7 @@ import {
   Alert,
 } from '@mui/material';
 import { updateProfile } from '../../api/profiles';
-import { ProfileEditDialogProps, FormData } from '../../types/profile';
+import { ProfileEditDialogProps, ProfileFormData } from '../../types/profile';
 import logger from '../../utils/logger';
 import getApiErrorMessage from '../../utils/getApiErrorMessage';
 
@@ -19,7 +19,7 @@ const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
   profile,
   onProfileUpdate,
 }) => {
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<ProfileFormData>({
     name: profile?.name || '',
     surname: profile?.surname || '',
     email: profile?.email || '',

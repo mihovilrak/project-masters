@@ -1,14 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  fetchRoles,
-  createUser,
-  getUserById,
-  updateUser,
-} from '../../api/users';
+import { createUser, getUserById, updateUser } from '../../api/users';
+import { getRoles } from '../../api/roles';
 import { Role } from '../../types/role';
 import {
-  FormData,
+  UserFormData,
   UserCreate,
   UserUpdate,
   UserFormProps,
@@ -22,7 +18,7 @@ export const useUserForm = ({ userId }: UserFormProps) => {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [roles, setRoles] = useState<Role[]>([]);
-  const [formValues, setFormValues] = useState<FormData>({
+  const [formValues, setFormValues] = useState<UserFormData>({
     login: '',
     name: '',
     surname: '',
@@ -37,7 +33,7 @@ export const useUserForm = ({ userId }: UserFormProps) => {
     const loadRoles = async () => {
       try {
         setLoading(true);
-        const roleData = await fetchRoles();
+        const roleData = await getRoles();
         setRoles(roleData);
         setError((prev) => (prev ? null : prev));
       } catch (error) {

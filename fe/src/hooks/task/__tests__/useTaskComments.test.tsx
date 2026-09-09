@@ -53,7 +53,7 @@ describe('useTaskComments', () => {
     await waitFor(() => {
       expect(result.current.comments).toEqual(mockComments);
     });
-    expect(getTaskComments).toHaveBeenCalledWith(1);
+    expect(getTaskComments).toHaveBeenCalledWith(1, expect.any(AbortSignal));
     expect(result.current.comments).toEqual(mockComments);
   });
 

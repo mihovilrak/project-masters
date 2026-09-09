@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useAsyncResource } from '../common/useAsyncResource';
 import { Comment } from '../../types/comment';
 import {
   getTaskComments,
@@ -10,24 +10,23 @@ import {
 import logger from '../../utils/logger';
 import getApiErrorMessage from '../../utils/getApiErrorMessage';
 
+const EMPTY_COMMENTS: Comment[] = [];
+
 export const useTaskComments = (taskId: string) => {
-  const [comments, setComments] = useState<Comment[]>([]);
   const { currentUser } = useAuth();
-
-  const fetchComments = async () => {
-    if (!taskId) return;
-    try {
-      const commentsData = await getTaskComments(Number(taskId));
-      setComments(commentsData || []);
-    } catch (error: unknown) {
-      logger.error('Failed to fetch comments:', error);
-      setComments([]);
-    }
-  };
-
-  useEffect(() => {
-    fetchComments();
-  }, [taskId]);
+  const {
+    data: comments,
+    setData: setComments,
+    refetch: fetchComments,
+  } = useAsyncResource<Comment[]>(
+    async (signal) => (await getTaskComments(Number(taskId), signal)) || [],
+    [taskId],
+    {
+      initialData: EMPTY_COMMENTS,
+      enabled: Boolean(taskId),
+      errorMessage: 'Failed to fetch comments',
+    },
+  );
 
   const handleCommentSubmit = async (content: string) => {
     try {
@@ -42,11 +41,9 @@ export const useTaskComments = (taskId: string) => {
         throw new Error('Failed to create comment');
       }
 
-      // Check if comment already exists to prevent duplicates
       setComments((prev) => {
         const exists = prev.some((c) => c?.id === newComment.id);
         if (exists) {
-          // If it exists, just refresh the list
           return prev.map((c) => (c?.id === newComment.id ? newComment : c));
         }
         return [...prev, newComment];

@@ -28,14 +28,6 @@ export interface StatCardProps {
   loading: boolean;
 }
 
-export interface ProfileUpdate {
-  name?: string;
-  surname?: string;
-  email?: string;
-  timezone?: string;
-  language?: string;
-}
-
 export interface PasswordChange {
   current_password: string;
   new_password: string;
@@ -55,10 +47,10 @@ export interface ProfileEditDialogProps {
   open: boolean;
   onClose: () => void;
   profile: ProfileData;
-  onProfileUpdate: (data: FormData) => Promise<void>;
+  onProfileUpdate: (data: ProfileFormData) => Promise<void>;
 }
 
-export interface FormData {
+export interface ProfileFormData {
   name: string;
   surname: string;
   email: string;
@@ -72,11 +64,6 @@ export interface ProfileTaskListProps {
   onTaskClick: (taskId: number) => void;
 }
 
-export interface ProfileProjectListProps {
-  projects: Project[];
-  loading?: boolean;
-}
-
 export interface PasswordChangeDialogProps {
   open: boolean;
   onClose: () => void;
@@ -87,31 +74,4 @@ export interface PasswordForm {
   newPassword: string;
   confirmPassword: string;
   error?: string;
-}
-
-export interface ActivityTimelineProps {
-  activities: Activity[];
-  loading?: boolean;
-}
-
-export interface Activity {
-  id: number;
-  type: string;
-  title: string;
-  description: string;
-  timestamp: string;
-  project?: {
-    id: number;
-    name: string;
-  };
-  task?: {
-    id: number;
-    name: string;
-  };
-}
-
-export interface ProfileTaskListProps {
-  tasks: Task[];
-  onTaskClick: (taskId: number) => void;
-  loading?: boolean;
 }

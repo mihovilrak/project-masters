@@ -3,9 +3,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import TypesAndRolesManager from '../TypesAndRolesManager';
 import { useTypesAndRoles } from '../../../hooks/setting/useTypesAndRoles';
 import userEvent from '@testing-library/user-event';
+import { usePermission } from '../../../hooks/common/usePermission';
 
 // Mock the custom hook
 jest.mock('../../../hooks/setting/useTypesAndRoles');
+jest.mock('../../../hooks/common/usePermission');
 
 // Mock the child components
 jest.mock('../TaskTypesTable', () => ({
@@ -55,6 +57,10 @@ describe('TypesAndRolesManager', () => {
   };
 
   beforeEach(() => {
+    (usePermission as jest.Mock).mockReturnValue({
+      hasPermission: true,
+      loading: false,
+    });
     (useTypesAndRoles as jest.Mock).mockReturnValue({
       state: mockState,
       ...mockHandlers,
@@ -163,6 +169,17 @@ describe('TypesAndRolesManager', () => {
     const addButton = screen.getByText('Add Task Type');
     fireEvent.click(addButton);
     expect(mockHandlers.handleCreate).toHaveBeenCalled();
+  });
+
+  it('disables creation without Admin permission', () => {
+    (usePermission as jest.Mock).mockReturnValue({
+      hasPermission: false,
+      loading: false,
+    });
+
+    render(<TypesAndRolesManager />);
+
+    expect(screen.getByText('Add Task Type')).toBeDisabled();
   });
 
   it('renders TypesAndRolesDialog with correct props', () => {

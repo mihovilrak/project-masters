@@ -37,7 +37,9 @@ describe('Task Types API', () => {
 
       const result = await getTaskTypes();
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/admin/task-types');
+      expect(mockedApi.get).toHaveBeenCalledWith('/admin/task-types', {
+        signal: undefined,
+      });
       expect(result).toEqual(mockTaskTypes);
     });
 

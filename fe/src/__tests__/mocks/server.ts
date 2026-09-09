@@ -1,6 +1,5 @@
-// Use require() to avoid ES module parsing issues with MSW dependencies
-const { setupServer } = require('msw/node');
-const { handlers } = require('./handlers');
+import { setupServer } from 'msw/node';
+import { handlers } from './handlers';
 
 /**
  * MSW server for Node.js (Jest) environment

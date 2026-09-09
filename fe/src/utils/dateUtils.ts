@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import dayjs from 'dayjs';
 
 type DateInput = string | number | Date | null | undefined;
 
@@ -38,7 +38,7 @@ export const formatDateTime = (value: DateInput, fallback = '—'): string => {
 
 /**
  * Local-midnight Date for a 'YYYY-MM-DD' value, for callers that need a Date
- * object (date pickers, date-fns/dayjs formatting). `new Date('2024-01-05')`
+ * object (date pickers and dayjs formatting). `new Date('2024-01-05')`
  * would parse as UTC midnight and format as the 4th west of Greenwich.
  */
 export const toLocalDate = (value: DateInput): Date | null => {
@@ -69,12 +69,12 @@ export const toDateOnlyString = (value: DateInput): string => {
   return `${date.getFullYear()}-${month}-${day}`;
 };
 
-/** date-fns formatting for a calendar date, without the UTC-parse day shift. */
+/** Dayjs formatting for a calendar date, without the UTC-parse day shift. */
 export const formatDatePattern = (
   value: DateInput,
   pattern: string,
   fallback = '—',
 ): string => {
   const date = toLocalDate(value);
-  return date ? format(date, pattern) : fallback;
+  return date ? dayjs(date).format(pattern) : fallback;
 };

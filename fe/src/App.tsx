@@ -42,7 +42,6 @@ import {
   useTaskFileWrapper,
   useTimeLogCalendarWrapper,
   useTaskTimeLogsWrapper,
-  useAppState,
 } from './hooks/app/useAppRoutes';
 
 const TaskFileWrapper: React.FC = () => {
@@ -78,8 +77,6 @@ const TaskTimeLogsWrapper: React.FC = () => {
 };
 
 const App: React.FC = () => {
-  const { taskFormOpen, handleTaskCreated, handleTaskFormClose } =
-    useAppState();
 
   return (
     <ThemeProvider>
@@ -227,7 +224,6 @@ const App: React.FC = () => {
                   />
                   <Route path="*" element={<NotFound />} />
                 </Route>
-                <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
           </ErrorBoundary>

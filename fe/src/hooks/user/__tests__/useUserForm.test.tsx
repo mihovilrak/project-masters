@@ -1,17 +1,14 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useUserForm } from '../useUserForm';
-import {
-  fetchRoles,
-  createUser,
-  getUserById,
-  updateUser,
-} from '../../../api/users';
+import { createUser, getUserById, updateUser } from '../../../api/users';
+import { getRoles } from '../../../api/roles';
 import { useNavigate } from 'react-router-dom';
 import { Role } from '../../../types/role';
 import { User } from '../../../types/user';
 
 // Mock the API functions and react-router-dom
 jest.mock('../../../api/users');
+jest.mock('../../../api/roles');
 jest.mock('react-router-dom', () => ({
   useNavigate: jest.fn(),
 }));
@@ -39,7 +36,7 @@ describe('useUserForm', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (fetchRoles as jest.Mock).mockResolvedValue(mockRoles);
+    (getRoles as jest.Mock).mockResolvedValue(mockRoles);
     (getUserById as jest.Mock).mockResolvedValue(mockUser);
     (createUser as jest.Mock).mockResolvedValue({ ...mockUser, id: 2 });
     (updateUser as jest.Mock).mockResolvedValue(mockUser);
@@ -66,7 +63,7 @@ describe('useUserForm', () => {
       await Promise.resolve();
     });
 
-    expect(fetchRoles).toHaveBeenCalled();
+    expect(getRoles).toHaveBeenCalled();
     expect(result.current.roles).toEqual(mockRoles);
     expect(result.current.loading).toBe(false);
   });

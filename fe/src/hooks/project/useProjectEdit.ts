@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { SelectChangeEvent } from '@mui/material';
-import { FormData, Project } from '../../types/project';
+import { ProjectEditFormData, Project } from '../../types/project';
 import { getProjectStatuses } from '../../api/projects';
 import logger from '../../utils/logger';
 import getApiErrorMessage from '../../utils/getApiErrorMessage';
 import { ProjectStatusId } from '../../constants/statusIds';
 
 export const useProjectEdit = (project: Project | null) => {
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<ProjectEditFormData>({
     name: '',
     description: null,
     start_date: '',
@@ -47,7 +47,7 @@ export const useProjectEdit = (project: Project | null) => {
   }, [project]);
 
   const handleTextChange =
-    (field: keyof FormData) =>
+    (field: keyof ProjectEditFormData) =>
     (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const value = event.target.value;
 

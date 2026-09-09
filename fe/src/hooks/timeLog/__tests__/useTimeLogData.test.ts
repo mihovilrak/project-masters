@@ -180,6 +180,22 @@ describe('useTimeLogData', () => {
     expect(result.current.isLoading).toBe(false);
   });
 
+  it('does not fetch data while closed', () => {
+    const { result } = renderHook(() =>
+      useTimeLogData({
+        open: false,
+        projectId: 1,
+        hasAdminPermission: true,
+      }),
+    );
+
+    expect(result.current.isLoading).toBe(false);
+    expect(getActivityTypes).not.toHaveBeenCalled();
+    expect(getProjects).not.toHaveBeenCalled();
+    expect(getUsers).not.toHaveBeenCalled();
+    expect(getProjectTasks).not.toHaveBeenCalled();
+  });
+
   it('should load projects and tasks on mount', async () => {
     const { result } = renderHook(() =>
       useTimeLogData({

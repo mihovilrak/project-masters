@@ -27,7 +27,9 @@ describe('Roles API', () => {
 
       const result = await getRoles();
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/roles');
+      expect(mockedApi.get).toHaveBeenCalledWith('/roles', {
+        signal: undefined,
+      });
       expect(result).toEqual([mockRole]);
     });
 

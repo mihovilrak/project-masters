@@ -5,7 +5,7 @@ import '@testing-library/jest-dom';
 import ProfileEditDialog from '../ProfileEditDialog';
 import { updateProfile } from '../../../api/profiles';
 import {
-  FormData,
+  ProfileFormData,
   ProfileData,
   ProfileEditDialogProps,
 } from '../../../types/profile';
@@ -45,7 +45,7 @@ describe('ProfileEditDialog', () => {
     profile: mockProfile,
     onProfileUpdate: jest
       .fn()
-      .mockImplementation(async (formData: FormData): Promise<void> => {
+      .mockImplementation(async (formData: ProfileFormData): Promise<void> => {
         return Promise.resolve();
       }),
   };

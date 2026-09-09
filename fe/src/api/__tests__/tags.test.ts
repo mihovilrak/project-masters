@@ -35,7 +35,9 @@ describe('Tags API', () => {
 
       const result = await getTags();
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/tags');
+      expect(mockedApi.get).toHaveBeenCalledWith('/tags', {
+        signal: undefined,
+      });
       expect(result).toEqual([mockTag]);
     });
 
@@ -121,7 +123,9 @@ describe('Tags API', () => {
 
       const result = await getTaskTags(taskId);
 
-      expect(mockedApi.get).toHaveBeenCalledWith(`/tasks/${taskId}/tags`);
+      expect(mockedApi.get).toHaveBeenCalledWith(`/tasks/${taskId}/tags`, {
+        signal: undefined,
+      });
       expect(result).toEqual([mockTag]);
     });
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useAsyncResource } from '../common/useAsyncResource';
 import { TaskWatcher } from '../../types/watcher';
 import {
   getTaskWatchers,
@@ -8,23 +8,22 @@ import {
 import logger from '../../utils/logger';
 import getApiErrorMessage from '../../utils/getApiErrorMessage';
 
+const EMPTY_WATCHERS: TaskWatcher[] = [];
+
 export const useTaskWatchers = (taskId: string) => {
-  const [watchers, setWatchers] = useState<TaskWatcher[]>([]);
-
-  const fetchWatchers = async () => {
-    if (!taskId) return;
-    try {
-      const watcherData = await getTaskWatchers(Number(taskId));
-      setWatchers(watcherData || []);
-    } catch (error: unknown) {
-      logger.error('Failed to fetch watchers:', error);
-      setWatchers([]);
-    }
-  };
-
-  useEffect(() => {
-    fetchWatchers();
-  }, [taskId]);
+  const {
+    data: watchers,
+    setData: setWatchers,
+    refetch: fetchWatchers,
+  } = useAsyncResource<TaskWatcher[]>(
+    async (signal) => (await getTaskWatchers(Number(taskId), signal)) || [],
+    [taskId],
+    {
+      initialData: EMPTY_WATCHERS,
+      enabled: Boolean(taskId),
+      errorMessage: 'Failed to fetch watchers',
+    },
+  );
 
   const handleAddWatcher = async (userId: number) => {
     try {
@@ -33,13 +32,9 @@ export const useTaskWatchers = (taskId: string) => {
 
       await addTaskWatcher(Number(taskId), userId);
       await fetchWatchers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Failed to add watcher:', error);
-      const errorMessage =
-        error?.response?.data?.error ||
-        error?.message ||
-        'Failed to add watcher';
-      throw new Error(errorMessage);
+      throw new Error(getApiErrorMessage(error, 'Failed to add watcher'));
     }
   };
 

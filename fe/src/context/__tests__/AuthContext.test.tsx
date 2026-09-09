@@ -150,6 +150,35 @@ describe('AuthContext', () => {
     expect(api.post).toHaveBeenCalledWith('/logout', {});
   });
 
+  it('clears auth state when the session becomes unauthorized', async () => {
+    const mockUser = { id: 1, name: 'Test User' };
+    (api.get as jest.Mock).mockResolvedValueOnce({
+      status: 200,
+      data: { user: mockUser, permissions: mockPermissions },
+    });
+
+    render(
+      <AuthProvider>
+        <TestComponent>
+          {(auth) => (
+            <div data-testid="auth-session">
+              {auth.currentUser ? 'signed-in' : 'signed-out'}
+            </div>
+          )}
+        </TestComponent>
+      </AuthProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-session')).toHaveTextContent('signed-in');
+    });
+
+    act(() => {
+      window.dispatchEvent(new Event('auth:unauthorized'));
+    });
+
+    expect(screen.getByTestId('auth-session')).toHaveTextContent('signed-out');
+  });
+
   it('should handle login errors', async () => {
     (api.post as jest.Mock).mockRejectedValueOnce(
       new Error('Invalid credentials'),

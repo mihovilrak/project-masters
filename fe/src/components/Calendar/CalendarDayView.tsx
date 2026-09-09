@@ -1,8 +1,8 @@
 import React from 'react';
-import { Box, Paper, Typography, Chip } from '@mui/material';
+import { Box, Paper, Typography } from '@mui/material';
 import { CalendarViewProps } from '../../types/calendar';
-import { getPriorityColor } from '../../utils/taskUtils';
 import { useTasksByHour } from '../../hooks/calendar/useTasksByHour';
+import CalendarTaskChip from './CalendarTaskChip';
 
 const CalendarDayView: React.FC<CalendarViewProps> = ({
   tasks,
@@ -45,31 +45,11 @@ const CalendarDayView: React.FC<CalendarViewProps> = ({
           </Typography>
           <Box sx={{ flex: 1 }}>
             {getTasksForHour(hour).map((task) => (
-              <Paper
+              <CalendarTaskChip
                 key={task.id}
-                sx={{
-                  p: 1,
-                  mb: 1,
-                  cursor: 'pointer',
-                  '&:hover': { backgroundColor: 'action.hover' },
-                }}
-                onClick={() => onTaskClick(task.id)}
-                data-testid={`task-chip-${task.id}`}
-              >
-                <Typography variant="subtitle2">{task.name}</Typography>
-                <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-                  <Chip
-                    label={task.priority_name}
-                    size="small"
-                    color={getPriorityColor(task.priority_name)}
-                  />
-                  <Chip
-                    label={task.status_name}
-                    size="small"
-                    variant="outlined"
-                  />
-                </Box>
-              </Paper>
+                task={task}
+                onClick={onTaskClick}
+              />
             ))}
             {getTimeLogsForHour(hour).map((timeLog) => (
               <Paper

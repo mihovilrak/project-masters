@@ -116,21 +116,13 @@ export interface ProjectTaskListProps {
   onTimeLogCreate?: (taskId: number) => void;
 }
 
-export interface EditMembersDialogProps {
-  open: boolean;
-  onClose: () => void;
-  projectId: number;
-  currentMembers: ProjectMember[];
-  onSave: (selectedUsers: number[]) => void;
-}
-
 export interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
   value: number;
 }
 
-export interface FormData extends Partial<Project> {
+export interface ProjectEditFormData extends Partial<Project> {
   name: string | undefined;
   description: string | null;
   start_date: string;

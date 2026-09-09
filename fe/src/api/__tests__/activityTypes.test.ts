@@ -30,7 +30,9 @@ describe('Activity Types API', () => {
 
       const result = await getActivityTypes();
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/admin/activity-types');
+      expect(mockedApi.get).toHaveBeenCalledWith('/admin/activity-types', {
+        signal: undefined,
+      });
       expect(result).toEqual([mockActivityType]);
     });
 

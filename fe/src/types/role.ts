@@ -1,4 +1,4 @@
-import { Permission } from './setting';
+import { Permission } from './admin';
 
 export interface Role {
   id: number;
@@ -16,6 +16,7 @@ export interface RolesTableProps {
   onEdit: (role: Role) => void;
   onDelete?: (id: number) => Promise<void>;
   loading?: boolean;
+  canManage?: boolean;
 }
 
 export interface RoleFormData {

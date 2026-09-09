@@ -33,7 +33,9 @@ describe('Notifications API', () => {
 
       const notifications = await getNotifications();
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/notifications');
+      expect(mockedApi.get).toHaveBeenCalledWith('/notifications', {
+        signal: undefined,
+      });
       expect(notifications).toEqual([mockNotification]);
     });
 
@@ -42,7 +44,9 @@ describe('Notifications API', () => {
       mockedApi.get.mockRejectedValueOnce(error);
 
       await expect(getNotifications()).rejects.toThrow(error);
-      expect(mockedApi.get).toHaveBeenCalledWith('/notifications');
+      expect(mockedApi.get).toHaveBeenCalledWith('/notifications', {
+        signal: undefined,
+      });
     });
   });
 

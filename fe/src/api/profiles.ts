@@ -1,5 +1,4 @@
 import { api } from './api';
-import logger from '../utils/logger';
 import { User } from '../types/user';
 import { Task } from '../types/task';
 import { Project } from '../types/project';
@@ -10,59 +9,38 @@ import {
 } from '../types/profile';
 
 // Get user profile
-export const getProfile = async (): Promise<ProfileData> => {
-  try {
-    const response = await api.get('/profile');
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to fetch user profile', error);
-    throw error;
-  }
+export const getProfile = async (
+  signal?: AbortSignal,
+): Promise<ProfileData> => {
+  const response = await api.get<ProfileData>('/profile', { signal });
+  return response.data;
 };
 
 // Update user profile
 export const updateProfile = async (
   profileData: ProfileUpdateData,
 ): Promise<User> => {
-  try {
-    const response = await api.put('/profile', profileData);
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to update user profile', error);
-    throw error;
-  }
+  const response = await api.put<User>('/profile', profileData);
+  return response.data;
 };
 
 // Change user password
 export const changePassword = async (
   passwordData: PasswordChange,
 ): Promise<void> => {
-  try {
-    await api.put('/profile/password', passwordData);
-  } catch (error) {
-    logger.error('Failed to change user password', error);
-    throw error;
-  }
+  await api.put<void>('/profile/password', passwordData);
 };
 
 // Get recent tasks
-export const getRecentTasks = async (): Promise<Task[]> => {
-  try {
-    const response = await api.get('/profile/tasks');
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to fetch recent tasks', error);
-    throw error;
-  }
+export const getRecentTasks = async (signal?: AbortSignal): Promise<Task[]> => {
+  const response = await api.get<Task[]>('/profile/tasks', { signal });
+  return response.data;
 };
 
 // Get recent projects
-export const getRecentProjects = async (): Promise<Project[]> => {
-  try {
-    const response = await api.get('/profile/projects');
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to fetch recent projects', error);
-    throw error;
-  }
+export const getRecentProjects = async (
+  signal?: AbortSignal,
+): Promise<Project[]> => {
+  const response = await api.get<Project[]>('/profile/projects', { signal });
+  return response.data;
 };

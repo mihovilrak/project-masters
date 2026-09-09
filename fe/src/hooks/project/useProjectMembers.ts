@@ -62,13 +62,14 @@ export const useProjectMembers = (projectId: string): ProjectMembersHook => {
         (userId) => !members.some((member) => member.user_id === userId),
       );
 
-      for (const userId of membersToRemove) {
-        await removeProjectMember(Number(projectId), userId);
-      }
-
-      for (const userId of membersToAdd) {
-        await addProjectMember(Number(projectId), userId);
-      }
+      await Promise.all([
+        ...membersToRemove.map((userId) =>
+          removeProjectMember(Number(projectId), userId),
+        ),
+        ...membersToAdd.map((userId) =>
+          addProjectMember(Number(projectId), userId),
+        ),
+      ]);
 
       await loadMembers();
     } catch (error) {

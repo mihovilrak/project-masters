@@ -22,7 +22,9 @@ describe('Permissions API', () => {
 
       const permissions = await getAllPermissions();
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/admin/permissions');
+      expect(mockedApi.get).toHaveBeenCalledWith('/admin/permissions', {
+        signal: undefined,
+      });
       expect(mockedApi.get).toHaveBeenCalledTimes(1);
       expect(permissions).toEqual([mockPermission]);
     });
@@ -32,7 +34,9 @@ describe('Permissions API', () => {
       mockedApi.get.mockRejectedValueOnce(error);
 
       await expect(getAllPermissions()).rejects.toThrow(error);
-      expect(mockedApi.get).toHaveBeenCalledWith('/admin/permissions');
+      expect(mockedApi.get).toHaveBeenCalledWith('/admin/permissions', {
+        signal: undefined,
+      });
       expect(mockedApi.get).toHaveBeenCalledTimes(1);
     });
   });

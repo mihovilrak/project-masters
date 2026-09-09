@@ -1,26 +1,25 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useAsyncResource } from '../common/useAsyncResource';
 import { TaskFile } from '../../types/file';
 import { getTaskFiles, uploadFile, deleteFile } from '../../api/files';
 import logger from '../../utils/logger';
 import getApiErrorMessage from '../../utils/getApiErrorMessage';
 
+const EMPTY_FILES: TaskFile[] = [];
+
 export const useTaskFiles = (taskId: string) => {
-  const [files, setFiles] = useState<TaskFile[]>([]);
-
-  const refreshFiles = useCallback(async () => {
-    if (!taskId) return;
-    try {
-      const filesData = await getTaskFiles(Number(taskId));
-      setFiles(filesData || []);
-    } catch (error: unknown) {
-      logger.error('Failed to fetch files:', error);
-      setFiles([]);
-    }
-  }, [taskId]);
-
-  useEffect(() => {
-    refreshFiles();
-  }, [refreshFiles]);
+  const {
+    data: files,
+    setData: setFiles,
+    refetch: refreshFiles,
+  } = useAsyncResource<TaskFile[]>(
+    async (signal) => (await getTaskFiles(Number(taskId), signal)) || [],
+    [taskId],
+    {
+      initialData: EMPTY_FILES,
+      enabled: Boolean(taskId),
+      errorMessage: 'Failed to fetch files',
+    },
+  );
 
   const handleFileUpload = async (file: File) => {
     try {
@@ -35,7 +34,7 @@ export const useTaskFiles = (taskId: string) => {
       if (!uploadedFile) {
         throw new Error('Failed to upload file');
       }
-      await refreshFiles(); // Refresh files after upload
+      await refreshFiles();
       return uploadedFile;
     } catch (error: unknown) {
       logger.error('Failed to upload file:', error);

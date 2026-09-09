@@ -70,7 +70,9 @@ describe('TimeLogs API', () => {
 
       const result = await getTaskTimeLogs(1);
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/time-logs/tasks/1/logs');
+      expect(mockedApi.get).toHaveBeenCalledWith('/time-logs/tasks/1/logs', {
+        signal: undefined,
+      });
       expect(result).toEqual([mockTimeLog]);
     });
 

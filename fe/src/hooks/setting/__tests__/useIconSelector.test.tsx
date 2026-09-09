@@ -39,7 +39,7 @@ describe('useIconSelector', () => {
 
     await waitFor(() => {
       expect(logger.error).toHaveBeenCalledWith(
-        'Failed to load icons:',
+        'Failed to load icons',
         expect.any(Error),
       );
       expect(result.current.icons).toEqual([]);

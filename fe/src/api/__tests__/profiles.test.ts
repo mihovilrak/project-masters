@@ -108,7 +108,9 @@ describe('Profile API', () => {
 
       const result = await getProfile();
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/profile');
+      expect(mockedApi.get).toHaveBeenCalledWith('/profile', {
+        signal: undefined,
+      });
       expect(result).toEqual(mockProfileData);
     });
 
@@ -117,7 +119,9 @@ describe('Profile API', () => {
       mockedApi.get.mockRejectedValueOnce(error);
 
       await expect(getProfile()).rejects.toThrow(error);
-      expect(mockedApi.get).toHaveBeenCalledWith('/profile');
+      expect(mockedApi.get).toHaveBeenCalledWith('/profile', {
+        signal: undefined,
+      });
     });
   });
 
@@ -165,7 +169,9 @@ describe('Profile API', () => {
 
       const result = await getRecentTasks();
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/profile/tasks');
+      expect(mockedApi.get).toHaveBeenCalledWith('/profile/tasks', {
+        signal: undefined,
+      });
       expect(result).toEqual(mockTasks);
     });
 
@@ -183,7 +189,9 @@ describe('Profile API', () => {
 
       const result = await getRecentProjects();
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/profile/projects');
+      expect(mockedApi.get).toHaveBeenCalledWith('/profile/projects', {
+        signal: undefined,
+      });
       expect(result).toEqual(mockProjects);
     });
 

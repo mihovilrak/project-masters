@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { SelectChangeEvent } from '@mui/material';
-import { User, FormData, UserUpdate, UserCreate } from '../../types/user';
-import { createUser, updateUser, fetchRoles } from '../../api/users';
+import { User, UserFormData, UserUpdate, UserCreate } from '../../types/user';
+import { createUser, updateUser } from '../../api/users';
+import { getRoles } from '../../api/roles';
 import { Role } from '../../types/role';
 import logger from '../../utils/logger';
 import getApiErrorMessage from '../../utils/getApiErrorMessage';
@@ -13,7 +14,7 @@ export const useUserDialog = (
   onClose: () => void,
   onUserSaved: (user: User) => void,
 ) => {
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<UserFormData>({
     login: '',
     name: '',
     surname: '',
@@ -33,15 +34,8 @@ export const useUserDialog = (
       const loadRoles = async () => {
         try {
           setRolesLoading(true);
-          const rolesData = await fetchRoles();
+          const rolesData = await getRoles();
           setRoles(rolesData);
-          // Set default role_id to first role if available, or keep current
-          if (rolesData.length > 0 && !user) {
-            setFormData((prev) => ({
-              ...prev,
-              role_id: prev.role_id || rolesData[0].id,
-            }));
-          }
         } catch (error) {
           logger.error('Failed to fetch roles:', error);
           setError('Failed to load roles');
@@ -51,9 +45,11 @@ export const useUserDialog = (
       };
       loadRoles();
     }
-  }, [open, user]);
+  }, [open]);
 
   useEffect(() => {
+    if (!open) return;
+
     if (user) {
       setFormData({
         login: user.login || '',
@@ -62,7 +58,7 @@ export const useUserDialog = (
         email: user.email || '',
         password: '',
         confirmPassword: '',
-        role_id: user.role_id || (roles.length > 0 ? roles[0].id : 3),
+        role_id: user.role_id || 3,
         status_id: user.status_id,
       });
     } else {
@@ -73,11 +69,11 @@ export const useUserDialog = (
         email: '',
         password: '',
         confirmPassword: '',
-        role_id: roles.length > 0 ? roles[0].id : 3,
+        role_id: 3,
         status_id: UserStatusId.Active,
       });
     }
-  }, [user, open, roles]);
+  }, [user, open]);
 
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const { name, value } = e.target;

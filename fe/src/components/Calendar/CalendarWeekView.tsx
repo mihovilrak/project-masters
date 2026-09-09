@@ -1,10 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Grid, Paper, Typography, Chip } from '@mui/material';
+import { Box, Grid, Paper, Typography } from '@mui/material';
 import { CalendarViewProps } from '../../types/calendar';
-import { getPriorityColor } from '../../utils/taskUtils';
 import { useCalendarWeek } from '../../hooks/calendar/useCalendarWeek';
 import dayjs from 'dayjs'; // Import dayjs library
+import { formatHoursClock } from '../../utils/timeUtils';
+import CalendarTaskChip from './CalendarTaskChip';
 
 const CalendarWeekView: React.FC<CalendarViewProps> = ({
   date,
@@ -22,12 +23,6 @@ const CalendarWeekView: React.FC<CalendarViewProps> = ({
     timeLogs,
   );
   const days = getWeekDays();
-
-  const formatTime = (hours: number): string => {
-    const wholeHours = Math.floor(hours);
-    const minutes = Math.round((hours - wholeHours) * 60);
-    return `${wholeHours}:${minutes.toString().padStart(2, '0')}`;
-  };
 
   return (
     <Grid container spacing={2} data-testid="week-grid">
@@ -59,41 +54,21 @@ const CalendarWeekView: React.FC<CalendarViewProps> = ({
               })}
             </Typography>
             {getTasksForDay(day).map((task) => (
-              <Paper
-                key={task?.id}
-                sx={{
-                  p: 1,
-                  mb: 1,
-                  cursor: 'pointer',
-                  '&:hover': { backgroundColor: 'action.hover' },
-                }}
-                onClick={() => task?.id && onTaskClick(task.id)}
-                data-testid={`task-chip-${task?.id}`}
-              >
-                <Typography variant="subtitle2">
-                  {task?.start_date
+              <CalendarTaskChip
+                key={task.id}
+                task={task}
+                onClick={onTaskClick}
+                prefix={
+                  task.start_date
                     ? dayjs(task.start_date).format('HH:mm')
-                    : 'No time'}{' '}
-                  - {task?.name || 'Unnamed Task'}
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-                  <Chip
-                    label={task?.priority_name || 'Unknown'}
-                    size="small"
-                    color={getPriorityColor(task?.priority_name || '')}
-                  />
-                  <Chip
-                    label={task?.status_name || 'Unknown'}
-                    size="small"
-                    variant="outlined"
-                  />
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                  {task?.due_date
+                    : 'No time'
+                }
+                footer={
+                  task.due_date
                     ? dayjs(task.due_date).format('HH:mm')
-                    : 'No due date'}
-                </Typography>
-              </Paper>
+                    : 'No due date'
+                }
+              />
             ))}
             {getTimeLogsForDay(day).map((timeLog) => (
               <Paper
@@ -116,7 +91,9 @@ const CalendarWeekView: React.FC<CalendarViewProps> = ({
                       })
                     : 'Unknown'}{' '}
                   - {timeLog?.task_name || 'Unknown Task'} (
-                  {timeLog?.spent_time ? formatTime(timeLog.spent_time) : '0'}{' '}
+                  {timeLog?.spent_time
+                    ? formatHoursClock(timeLog.spent_time)
+                    : '0'}{' '}
                   hours)
                 </Typography>
               </Paper>

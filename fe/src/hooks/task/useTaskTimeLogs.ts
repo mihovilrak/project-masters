@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useAsyncResource } from '../common/useAsyncResource';
 import { TimeLog, TimeLogCreate } from '../../types/timeLog';
 import {
   getTaskTimeLogs,
@@ -10,26 +10,21 @@ import {
 import logger from '../../utils/logger';
 import getApiErrorMessage from '../../utils/getApiErrorMessage';
 
+const EMPTY_TIME_LOGS: TimeLog[] = [];
+
 export const useTaskTimeLogs = (taskId: string) => {
-  const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
   const { currentUser } = useAuth();
-
-  const fetchTimeLogs = useCallback(async () => {
-    if (!taskId) return;
-    try {
-      const timeLogsData = await getTaskTimeLogs(Number(taskId));
-      logger.debug('Fetched time logs:', timeLogsData);
-      setTimeLogs(timeLogsData || []);
-    } catch (error: unknown) {
-      logger.error('Failed to fetch time logs:', error);
-      setTimeLogs([]);
-    }
-  }, [taskId]);
-
-  // Automatically fetch time logs on mount and when taskId changes
-  useEffect(() => {
-    fetchTimeLogs();
-  }, [fetchTimeLogs]);
+  const { data: timeLogs, refetch: fetchTimeLogs } = useAsyncResource<
+    TimeLog[]
+  >(
+    async (signal) => (await getTaskTimeLogs(Number(taskId), signal)) || [],
+    [taskId],
+    {
+      initialData: EMPTY_TIME_LOGS,
+      enabled: Boolean(taskId),
+      errorMessage: 'Failed to fetch time logs',
+    },
+  );
 
   const handleTimeLogSubmit = async (
     timeLogData: TimeLogCreate,
@@ -43,24 +38,14 @@ export const useTaskTimeLogs = (taskId: string) => {
         throw new Error('Task ID is required');
       }
 
-      logger.debug(
-        'Submitting time log:',
-        timeLogData,
-        'timeLogId:',
-        timeLogId,
-      );
       let result: TimeLog;
-
-      // Check if we're updating an existing time log
       if (timeLogId) {
         result = await updateTimeLog(timeLogId, timeLogData);
-        logger.debug('Updated time log:', result);
       } else {
         result = await createTimeLog(Number(taskId), timeLogData);
-        logger.debug('Created time log:', result);
       }
 
-      await fetchTimeLogs(); // Refresh time logs after submission
+      await fetchTimeLogs();
       return result;
     } catch (error: unknown) {
       logger.error('Failed to submit time log:', error);
@@ -71,7 +56,7 @@ export const useTaskTimeLogs = (taskId: string) => {
   const deleteTimeLog = async (timeLogId: number): Promise<void> => {
     try {
       await deleteTimeLogApi(timeLogId);
-      await fetchTimeLogs(); // Refresh time logs after deletion
+      await fetchTimeLogs();
     } catch (error: unknown) {
       logger.error('Failed to delete time log:', error);
       throw new Error(getApiErrorMessage(error, 'Failed to delete time log'));

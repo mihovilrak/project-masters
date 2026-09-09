@@ -218,7 +218,9 @@ describe('Settings Profile Integration Tests', () => {
     });
 
     // Verify API calls were made during rendering (session + permissions via check-session only)
-    expect(mockedApi.get).toHaveBeenCalledWith('/check-session');
+    expect(mockedApi.get).toHaveBeenCalledWith('/check-session', {
+      signal: expect.any(AbortSignal),
+    });
   });
 
   // Test 4: Mock app settings update
@@ -241,7 +243,9 @@ describe('Settings Profile Integration Tests', () => {
     });
 
     // Verify initial API calls
-    expect(mockedApi.get).toHaveBeenCalledWith('/check-session');
+    expect(mockedApi.get).toHaveBeenCalledWith('/check-session', {
+      signal: expect.any(AbortSignal),
+    });
   });
 
   // Test 5: Mock role management
@@ -264,7 +268,9 @@ describe('Settings Profile Integration Tests', () => {
     });
 
     // Verify initial API calls
-    expect(mockedApi.get).toHaveBeenCalledWith('/check-session');
+    expect(mockedApi.get).toHaveBeenCalledWith('/check-session', {
+      signal: expect.any(AbortSignal),
+    });
   });
 
   // Test 6: Mock activity type management
@@ -290,6 +296,8 @@ describe('Settings Profile Integration Tests', () => {
     });
 
     // Verify initial API calls
-    expect(mockedApi.get).toHaveBeenCalledWith('/check-session');
+    expect(mockedApi.get).toHaveBeenCalledWith('/check-session', {
+      signal: expect.any(AbortSignal),
+    });
   });
 });

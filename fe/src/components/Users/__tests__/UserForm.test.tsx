@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import UserForm from '../UserForm';
 import { useUserForm } from '../../../hooks/user/useUserForm';
-import { FormData } from '../../../types/user';
+import { UserFormData } from '../../../types/user';
 import { Role } from '../../../types/role';
 
 // Mock the custom hook
@@ -17,7 +17,7 @@ const mockRoles: Role[] = [
   { id: 2, name: 'User' },
 ];
 
-const defaultMockFormValues: FormData = {
+const defaultMockFormValues: UserFormData = {
   login: '',
   name: '',
   surname: '',

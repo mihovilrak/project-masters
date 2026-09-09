@@ -8,9 +8,6 @@ import {
   updateUser,
   deleteUser,
   changeUserStatus,
-  getUserRoles,
-  updateUserRoles,
-  fetchRoles,
 } from '../users';
 
 jest.mock('../api');
@@ -141,53 +138,6 @@ describe('Users API', () => {
       const error = new Error('Failed to change user status');
       mockedApi.patch.mockRejectedValueOnce(error);
       await expect(changeUserStatus(1)).rejects.toThrow(error);
-    });
-  });
-
-  describe('getUserRoles', () => {
-    it('should fetch user roles', async () => {
-      const mockRoles = ['Admin', 'Developer'];
-      mockedApi.get.mockResolvedValueOnce({ data: mockRoles });
-      const result = await getUserRoles(1);
-      expect(mockedApi.get).toHaveBeenCalledWith('/users/1/roles');
-      expect(result).toEqual(mockRoles);
-    });
-
-    it('should handle error when fetching user roles', async () => {
-      const error = new Error('Failed to fetch user roles');
-      mockedApi.get.mockRejectedValueOnce(error);
-      await expect(getUserRoles(1)).rejects.toThrow(error);
-    });
-  });
-
-  describe('updateUserRoles', () => {
-    it('should update user roles', async () => {
-      mockedApi.put.mockResolvedValueOnce({ data: undefined });
-      await updateUserRoles(1, [1, 2]);
-      expect(mockedApi.put).toHaveBeenCalledWith('/users/1/roles', {
-        roles: [1, 2],
-      });
-    });
-
-    it('should handle error when updating user roles', async () => {
-      const error = new Error('Failed to update user roles');
-      mockedApi.put.mockRejectedValueOnce(error);
-      await expect(updateUserRoles(1, [1, 2])).rejects.toThrow(error);
-    });
-  });
-
-  describe('fetchRoles', () => {
-    it('should fetch all roles', async () => {
-      mockedApi.get.mockResolvedValueOnce({ data: [mockRole] });
-      const result = await fetchRoles();
-      expect(mockedApi.get).toHaveBeenCalledWith('/roles');
-      expect(result).toEqual([mockRole]);
-    });
-
-    it('should handle error when fetching roles', async () => {
-      const error = new Error('Failed to fetch roles');
-      mockedApi.get.mockRejectedValueOnce(error);
-      await expect(fetchRoles()).rejects.toThrow(error);
     });
   });
 });

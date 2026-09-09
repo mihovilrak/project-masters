@@ -57,3 +57,27 @@ export const chipPropsForPriority = (
   }
   return { color: getPriorityColor(priorityName || '') };
 };
+
+/** Comma-separated or single ID filter value -> list of IDs, or null when unset */
+export const parseIdFilter = (
+  value: number | string | null | undefined,
+): number[] | null => {
+  if (value == null || value === '') return null;
+  const raw = String(value);
+  if (raw.includes(',')) {
+    return raw
+      .split(',')
+      .map((s) => Number(s.trim()))
+      .filter((n) => !Number.isNaN(n));
+  }
+  return [Number(value)];
+};
+
+/** Same value shaped for the API query string: kept as CSV, otherwise numeric */
+export const idFilterParam = (
+  value: number | string | null | undefined,
+): string | number | undefined => {
+  if (value == null || value === '') return undefined;
+  const raw = String(value);
+  return raw.includes(',') ? raw : Number(value);
+};

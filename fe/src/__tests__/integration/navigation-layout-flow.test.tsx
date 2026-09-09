@@ -4,7 +4,6 @@ import { useNavigation } from '../../hooks/layout/useNavigation';
 import { useTheme } from '../../context/ThemeContext';
 import { useMediaQuery } from '@mui/material';
 import { useAuth } from '../../context/AuthContext';
-import { useAppState } from '../../hooks/app/useAppRoutes';
 
 jest.mock('../../hooks/layout/useNavigation');
 jest.mock('../../context/ThemeContext');
@@ -42,8 +41,6 @@ describe('Navigation and Layout Flow', () => {
   const mockHandleTabChange = jest.fn();
   const mockToggleSidebar = jest.fn();
   const mockToggleTheme = jest.fn();
-  const mockHandleTaskCreated = jest.fn();
-  const mockHandleTaskFormClose = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -67,12 +64,6 @@ describe('Navigation and Layout Flow', () => {
     (useTheme as jest.Mock).mockReturnValue({
       mode: 'light',
       toggleTheme: mockToggleTheme,
-    });
-
-    (useAppState as jest.Mock).mockReturnValue({
-      taskFormOpen: false,
-      handleTaskCreated: mockHandleTaskCreated,
-      handleTaskFormClose: mockHandleTaskFormClose,
     });
 
     (useMediaQuery as jest.Mock).mockReturnValue(false);

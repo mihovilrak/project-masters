@@ -1,23 +1,26 @@
 import React from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import { Box, Typography, Paper, Grid, Alert } from '@mui/material';
+import {
+  Box,
+  Typography,
+  Paper,
+  Grid,
+  Alert,
+  TextField,
+  Button,
+} from '@mui/material';
 import { useAuth } from '../../context/AuthContext';
 import { useTaskForm } from '../../hooks/task/useTaskForm';
 import { SimpleChangeEvent } from '../../types/task';
+import { Tag } from '../../types/tag';
 
-import { TaskNameField } from './Form/TaskNameField';
-import { TaskDescriptionField } from './Form/TaskDescriptionField';
 import { DatePickerSection } from './Form/DatePickerSection';
-import { TaskStatusSelect } from './Form/TaskStatusSelect';
-import { TaskPrioritySelect } from './Form/TaskPrioritySelect';
+import { ColorOptionSelect } from './Form/ColorOptionSelect';
 import { ProjectSelect } from './ProjectSelect';
 import { AssigneeSelectionSection } from './Form/AssigneeSelectionSection';
 import { ParentTaskSelect } from './Form/ParentTaskSelect';
-import { TaskTypeSection } from './Form/TaskTypeSection';
-import { TaskTagsSection } from './Form/TaskTagsSection';
-import { EstimatedTimeField } from './Form/EstimatedTimeField';
-import { TaskFormActionButtons } from './Form/TaskFormActionButtons';
-import { TaskProgressField } from './Form/TaskProgressField';
+import TaskTypeSelect from './TaskTypeSelect';
+import TagSelect from './TagSelect';
 
 const TaskForm: React.FC = () => {
   const { currentUser } = useAuth();
@@ -100,9 +103,16 @@ const TaskForm: React.FC = () => {
       <form onSubmit={onSubmit} data-testid="task-form">
         <Grid container spacing={2}>
           <Grid size={{ xs: 12 }}>
-            <TaskNameField
-              formData={formData}
-              handleChange={handleFormChange}
+            <TextField
+              fullWidth
+              label="Name"
+              name="name"
+              value={formData.name}
+              onChange={handleFormChange}
+              required
+              error={!!fieldErrors.name}
+              helperText={fieldErrors.name}
+              sx={{ mb: 2 }}
             />
           </Grid>
 
@@ -127,9 +137,15 @@ const TaskForm: React.FC = () => {
           )}
 
           <Grid size={{ xs: 12 }}>
-            <TaskDescriptionField
-              formData={formData}
-              handleChange={handleFormChange}
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              label="Description"
+              name="description"
+              value={formData.description || ''}
+              onChange={handleFormChange}
+              sx={{ mb: 2 }}
             />
           </Grid>
 
@@ -145,16 +161,20 @@ const TaskForm: React.FC = () => {
           </Grid>
 
           <Grid size={{ xs: 12, sm: 6 }}>
-            <TaskPrioritySelect
-              formData={formData}
-              priorities={priorities}
+            <ColorOptionSelect
+              label="Priority"
+              name="priority_id"
+              value={formData.priority_id || ''}
+              options={priorities}
               handleChange={handleFormChange}
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>
-            <TaskStatusSelect
-              formData={formData}
-              statuses={statuses}
+            <ColorOptionSelect
+              label="Status"
+              name="status_id"
+              value={formData.status_id || ''}
+              options={statuses}
               handleChange={handleFormChange}
             />
           </Grid>
@@ -168,36 +188,78 @@ const TaskForm: React.FC = () => {
           </Grid>
 
           <Grid size={{ xs: 12, sm: 6 }}>
-            <TaskTypeSection
-              formData={formData}
-              handleChange={handleFormChange}
-            />
+            <Box sx={{ mb: 2 }}>
+              <TaskTypeSelect
+                value={formData.type_id || 0}
+                onChange={(e) =>
+                  handleFormChange({
+                    target: { name: 'type_id', value: e.target.value },
+                  })
+                }
+                required
+              />
+            </Box>
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>
-            <EstimatedTimeField
-              formData={formData}
-              handleChange={handleFormChange}
+            <TextField
+              fullWidth
+              label="Estimated Time (hours)"
+              name="estimated_time"
+              type="number"
+              value={formData.estimated_time ?? ''}
+              onChange={handleFormChange}
+              inputProps={{ min: 0, step: 0.5 }}
+              sx={{ mb: 2 }}
             />
           </Grid>
 
           {isEditing && (
             <Grid size={{ xs: 12 }}>
-              <TaskProgressField
+              <TextField
+                fullWidth
+                type="number"
+                label="Progress (%)"
+                name="progress"
                 value={formData.progress || 0}
-                handleChange={handleFormChange}
+                onChange={handleFormChange}
+                inputProps={{ min: 0, max: 100, step: 1 }}
+                sx={{ mb: 2 }}
               />
             </Grid>
           )}
 
           <Grid size={{ xs: 12 }}>
-            <TaskTagsSection
-              formData={formData}
-              handleChange={handleFormChange}
-            />
+            <Box sx={{ mb: 2 }}>
+              <TagSelect
+                selectedTags={formData.tags || []}
+                onTagsChange={(newTags: Tag[]) =>
+                  handleFormChange({ target: { name: 'tags', value: newTags } })
+                }
+              />
+            </Box>
           </Grid>
 
           <Grid size={{ xs: 12 }}>
-            <TaskFormActionButtons isEditing={isEditing} />
+            <Box
+              sx={{
+                mt: 2,
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 2,
+              }}
+            >
+              <Button
+                type="button"
+                data-testid="cancel-button"
+                onClick={() => window.history.back()}
+                color="inherit"
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="contained" color="primary">
+                {isEditing ? 'Update Task' : 'Create Task'}
+              </Button>
+            </Box>
           </Grid>
         </Grid>
       </form>

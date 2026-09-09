@@ -31,7 +31,9 @@ describe('Watchers API', () => {
 
       const result = await getTaskWatchers(1);
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/tasks/1/watchers');
+      expect(mockedApi.get).toHaveBeenCalledWith('/tasks/1/watchers', {
+        signal: undefined,
+      });
       expect(result).toEqual(mockTaskWatchers);
     });
 

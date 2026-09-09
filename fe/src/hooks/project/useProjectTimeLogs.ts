@@ -22,22 +22,23 @@ export const useProjectTimeLogs = (projectId: string): ProjectTimeLogsHook => {
       const tasks = await getProjectTasks(Number(projectId));
       let allLogs: TimeLog[] = [];
       if (tasks && Array.isArray(tasks)) {
-        for (const task of tasks) {
-          if (task?.id) {
-            try {
-              const taskLogs = await getTaskTimeLogs(task.id);
-              if (taskLogs && Array.isArray(taskLogs)) {
-                allLogs = [...allLogs, ...taskLogs];
+        const taskLogGroups = await Promise.all(
+          tasks
+            .filter((task) => task?.id)
+            .map(async (task) => {
+              try {
+                const taskLogs = await getTaskTimeLogs(task.id);
+                return taskLogs && Array.isArray(taskLogs) ? taskLogs : [];
+              } catch (taskError) {
+                logger.error(
+                  `Failed to load time logs for task ${task.id}:`,
+                  taskError,
+                );
+                return [];
               }
-            } catch (taskError) {
-              logger.error(
-                `Failed to load time logs for task ${task.id}:`,
-                taskError,
-              );
-              // Continue with other tasks even if one fails
-            }
-          }
-        }
+            }),
+        );
+        allLogs = taskLogGroups.flat();
       }
       setTimeLogs(allLogs);
     } catch (error: unknown) {

@@ -1,7 +1,11 @@
+// Date-bucketing tests assert local-time hours; pin the zone so they don't
+// depend on the developer's machine matching the UTC CI runners.
+process.env.TZ = 'UTC';
+
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 module.exports = {
   preset: 'ts-jest',
-  testEnvironment: 'jsdom', // MSW v1 works with standard jsdom
+  testEnvironment: 'jest-fixed-jsdom', // MSW v2 needs Node globals jsdom strips
   roots: ['<rootDir>/src'],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   // CI runners are slower; avoid timeout flakiness (default 5000)
@@ -22,7 +26,7 @@ module.exports = {
     '^.+\\.(js|jsx|mjs|cjs|es\\.js)$': ['babel-jest', { rootMode: 'upward' }],
   },
   transformIgnorePatterns: [
-    '/node_modules/(?!(@mui|@emotion|mui-color-input|react-router-dom|@mswjs|msw|web-streams-polyfill|@open-draft|outvariant|headers-polyfill|until-async|rettime|tagged-tag|yoctocolors-cjs|@inquirer)).+',
+    '/node_modules/(?!(@mui|@emotion|mui-color-input|react-router-dom|@mswjs|msw|@open-draft|outvariant|headers-polyfill|until-async|rettime|tagged-tag|is-node-process|strict-event-emitter|graphql|yoctocolors-cjs|@inquirer)).+',
   ],
   testRegex: '\\.(test|spec)\\.[tj]sx?$',
   testPathIgnorePatterns: [

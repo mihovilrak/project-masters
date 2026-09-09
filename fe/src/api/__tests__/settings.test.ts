@@ -6,6 +6,7 @@ import {
   getSystemSettings,
   updateSystemSettings,
   getAppTheme,
+  testSmtpConnection,
 } from '../settings';
 
 // Mock the api module
@@ -51,7 +52,9 @@ describe('Settings API', () => {
 
       const result = await getUserSettings();
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/settings/user_settings');
+      expect(mockedApi.get).toHaveBeenCalledWith('/settings/user_settings', {
+        signal: undefined,
+      });
       expect(result).toEqual(mockUserSettings);
     });
 
@@ -89,7 +92,9 @@ describe('Settings API', () => {
 
       const result = await getSystemSettings();
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/settings/app_settings');
+      expect(mockedApi.get).toHaveBeenCalledWith('/settings/app_settings', {
+        signal: undefined,
+      });
       expect(result).toEqual(mockAppSettings);
     });
 
@@ -134,13 +139,34 @@ describe('Settings API', () => {
       expect(result).toEqual(mockTheme);
     });
 
-    it('should return default theme when fetch fails', async () => {
+    it('should throw error when fetch fails', async () => {
       const error = new Error('Network error');
       mockedApi.get.mockRejectedValueOnce(error);
 
-      const result = await getAppTheme();
+      await expect(getAppTheme()).rejects.toThrow(error);
+    });
+  });
 
-      expect(result).toEqual({ theme: 'light' });
+  describe('testSmtpConnection', () => {
+    it('should return the SMTP test result', async () => {
+      const smtpResult = { success: true, message: 'Connection successful' };
+      mockedApi.post.mockResolvedValueOnce({ data: smtpResult });
+
+      await expect(testSmtpConnection('admin@example.com')).resolves.toEqual(
+        smtpResult,
+      );
+      expect(mockedApi.post).toHaveBeenCalledWith('/settings/test-smtp', {
+        email: 'admin@example.com',
+      });
+    });
+
+    it('should throw error when the SMTP test fails', async () => {
+      const error = new Error('SMTP unavailable');
+      mockedApi.post.mockRejectedValueOnce(error);
+
+      await expect(testSmtpConnection('admin@example.com')).rejects.toThrow(
+        error,
+      );
     });
   });
 });

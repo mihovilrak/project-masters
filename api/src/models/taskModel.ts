@@ -340,6 +340,31 @@ export const getTasksByProject = async (
   return result.rows;
 };
 
+// Get tasks whose start/due window overlaps a date range (calendar view).
+// Tasks with neither date set are excluded - they have nowhere to sit on a calendar.
+export const getTasksByDateRange = async (
+  pool: Pool,
+  startDate: string,
+  endDate: string,
+  scopeUserId?: string | null,
+): Promise<TaskDetails[]> => {
+  const scoped = scopeUserId != null;
+  const conditions = [
+    'coalesce(start_date, due_date) <= $2::date',
+    'coalesce(due_date, start_date) >= $1::date',
+  ];
+  if (scoped) {
+    conditions.push(`project_id IN (${accessibleProjectsSubquery(3)})`);
+  }
+  const result: QueryResult<TaskDetails> = await pool.query(
+    `SELECT * FROM get_tasks(null, null, null, null, null, null, null, null, false, null, null, null, null, null, null, null, null, null, false, null, null, null, null, null, null, null)
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY start_date NULLS LAST, id`,
+    [startDate, endDate, ...(scoped ? [scopeUserId] : [])],
+  );
+  return result.rows;
+};
+
 // Get subtasks
 export const getSubtasks = async (
   pool: Pool,

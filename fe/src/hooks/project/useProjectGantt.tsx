@@ -1,41 +1,30 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTheme } from '@mui/material/styles';
 import { FormattedTask } from '../../types/project';
+import { Task } from '../../types/task';
 import { toLocalDate } from '../../utils/dateUtils';
 
-export const useProjectGantt = (initialTasks: any[]) => {
-  const [tasks, setTasks] = useState<FormattedTask[]>([]);
-  const [loading, setLoading] = useState(true);
+export const useProjectGantt = (initialTasks: Task[]) => {
   const [error, setErrorState] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentViewName, setCurrentViewName] = useState('Month');
   const theme = useTheme();
 
-  useEffect(() => {
-    const formattedTasks: FormattedTask[] = (initialTasks || []).map(
-      (task) => ({
+  const tasks = useMemo<FormattedTask[]>(
+    () =>
+      (initialTasks || []).map((task) => ({
         id: task.id,
         title: task.name,
         startDate: toLocalDate(task.start_date) as Date,
         endDate: toLocalDate(task.due_date) as Date,
-        assigneeId: task.assignee_id,
+        assigneeId: task.assignee_id ?? null,
         type_name: task.type_name,
         priority: task.priority_name,
         status: task.status_name,
         description: task.description,
-      }),
-    );
-    // Only update state if tasks actually changed
-    if (
-      formattedTasks.length !== tasks.length ||
-      !formattedTasks.every(
-        (t, i) => JSON.stringify(t) === JSON.stringify(tasks[i]),
-      )
-    ) {
-      setTasks(formattedTasks);
-    }
-    setLoading(false);
-  }, [initialTasks, tasks]);
+      })),
+    [initialTasks],
+  );
 
   const getStatusColor = useCallback(
     (status: string) => {
@@ -147,7 +136,7 @@ export const useProjectGantt = (initialTasks: any[]) => {
 
   return {
     tasks,
-    loading,
+    loading: false,
     error: error,
     currentDate,
     currentViewName,

@@ -84,7 +84,7 @@ describe('useNotificationCenter', () => {
       await flushPromises();
     });
     await waitFor(() => {
-      expect(getNotifications).toHaveBeenCalledWith();
+      expect(getNotifications).toHaveBeenCalledWith(expect.any(AbortSignal));
       expect(result.current.notifications).toEqual(mockNotifications);
       expect(result.current.unreadCount).toBe(1); // Only one notification is unread
     });
@@ -207,7 +207,7 @@ describe('useNotificationCenter', () => {
     await flushPromises();
     await waitFor(() => {
       expect(logger.error).toHaveBeenCalledWith(
-        'Failed to fetch notifications:',
+        'Failed to load notifications',
         expect.any(Error),
       );
       expect(result.current.notifications).toEqual([]);

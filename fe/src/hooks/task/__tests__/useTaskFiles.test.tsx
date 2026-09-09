@@ -43,7 +43,7 @@ describe('useTaskFiles', () => {
     // await waitForNextUpdate();
 
     await waitFor(() => {
-      expect(getTaskFiles).toHaveBeenCalledWith(1);
+      expect(getTaskFiles).toHaveBeenCalledWith(1, expect.any(AbortSignal));
     });
     await waitFor(() => {
       expect(result.current.files).toEqual(mockFiles);
@@ -88,7 +88,10 @@ describe('useTaskFiles', () => {
     (deleteFile as jest.Mock).mockResolvedValue(undefined);
 
     const { result } = renderHook(() => useTaskFiles('1'));
-    // await waitForNextUpdate();
+
+    await waitFor(() => {
+      expect(result.current.files).toEqual(mockFiles);
+    });
 
     await act(async () => {
       await result.current.handleFileDelete(1);
@@ -145,7 +148,7 @@ describe('useTaskFiles', () => {
     });
 
     await waitFor(() => {
-      expect(getTaskFiles).toHaveBeenCalledWith(1);
+      expect(getTaskFiles).toHaveBeenCalledWith(1, expect.any(AbortSignal));
     });
   });
 });

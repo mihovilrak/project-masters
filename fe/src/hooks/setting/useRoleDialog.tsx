@@ -3,8 +3,9 @@ import { Role } from '../../types/role';
 import { Permission } from '../../types/setting';
 import { RoleFormData } from '../../types/role';
 import { getAllPermissions } from '../../api/permissions';
-import logger from '../../utils/logger';
-import getApiErrorMessage from '../../utils/getApiErrorMessage';
+import { useAsyncResource } from '../common/useAsyncResource';
+
+const EMPTY_PERMISSIONS: Permission[] = [];
 
 export const useRoleDialog = (role: Role | undefined) => {
   const [formData, setFormData] = useState<RoleFormData>({
@@ -13,14 +14,19 @@ export const useRoleDialog = (role: Role | undefined) => {
     active: true,
     permissions: [],
   });
-  const [availablePermissions, setAvailablePermissions] = useState<
-    Permission[]
-  >([]);
-  const [error, setError] = useState<string | undefined>(undefined);
 
-  useEffect(() => {
-    fetchPermissions();
-  }, []);
+  const {
+    data: availablePermissions,
+    error: fetchError,
+    setError: setFetchError,
+  } = useAsyncResource<Permission[]>(
+    async (signal) => (await getAllPermissions(signal)) || [],
+    [],
+    {
+      initialData: EMPTY_PERMISSIONS,
+      errorMessage: 'Failed to load permissions',
+    },
+  );
 
   useEffect(() => {
     if (role) {
@@ -44,17 +50,6 @@ export const useRoleDialog = (role: Role | undefined) => {
     }
   }, [role]);
 
-  const fetchPermissions = async () => {
-    try {
-      const permissions = await getAllPermissions();
-      setAvailablePermissions(permissions || []);
-    } catch (error: unknown) {
-      logger.error('Failed to fetch permissions:', error);
-      setAvailablePermissions([]);
-      setError(getApiErrorMessage(error, 'Failed to load permissions'));
-    }
-  };
-
   const handleChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({
       ...prev,
@@ -71,7 +66,7 @@ export const useRoleDialog = (role: Role | undefined) => {
     }));
   };
 
-  const clearError = () => setError(undefined);
+  const clearError = () => setFetchError(null);
 
   const groupedPermissions = availablePermissions.reduce<
     Record<string, Permission[]>
@@ -86,11 +81,11 @@ export const useRoleDialog = (role: Role | undefined) => {
 
   return {
     formData,
-    error,
+    error: fetchError ?? undefined,
     groupedPermissions,
     handleChange,
     handlePermissionToggle,
     clearError,
-    setError,
+    setError: setFetchError,
   };
 };

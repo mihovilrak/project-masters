@@ -47,6 +47,25 @@ export interface TaskCoreState {
 }
 
 export interface TaskFilters {
+  id?: number;
+  project_id?: number | string;
+  assignee_id?: number | string;
+  holder_id?: number | string;
+  status_id?: number | string;
+  priority_id?: number | string;
+  type_id?: number | string;
+  parent_id?: number;
+  created_by?: number | string;
+  due_date_from?: string;
+  due_date_to?: string;
+  start_date_from?: string;
+  start_date_to?: string;
+  created_from?: string;
+  created_to?: string;
+  estimated_time_min?: number;
+  estimated_time_max?: number;
+  inactive_statuses_only?: boolean | 0 | 1;
+  active_statuses_only?: boolean | 0 | 1;
   status?: number;
   priority?: number;
   assignee?: number;
@@ -54,15 +73,14 @@ export interface TaskFilters {
   type?: number;
   project?: number;
   search?: string;
-  [key: string]: any;
 }
 
 export interface TaskType {
   id: number;
   name: string;
-  description?: string;
+  description?: string | null;
   color: string;
-  icon?: string;
+  icon?: string | null;
   created_on?: string;
   updated_on?: string | null;
   active?: boolean;
@@ -86,21 +104,6 @@ export interface TaskPriority {
   active: boolean;
   created_on: string;
   updated_on: string | null;
-}
-
-export interface TaskTableProps {
-  tasks: Task[];
-  loading: boolean;
-  priorities: TaskPriority[];
-  statuses: TaskStatus[];
-  users: ProjectMember[];
-  taskTypes: TaskType[];
-}
-
-export interface TaskListProps {
-  tasks: Task[];
-  onTaskUpdated: () => void;
-  projectId: number;
 }
 
 export interface TaskFormProps {
@@ -218,19 +221,9 @@ export interface TaskDetailsState {
   watcherDialogOpen: boolean;
 }
 
-export interface TaskFormActionButtonsProps {
-  isEditing: boolean;
-  onCancel?: () => void;
-}
-
 export interface AssigneeSelectionSectionProps {
   formData: TaskFormState;
   projectMembers: ProjectMember[];
-  handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}
-
-export interface TaskDescriptionFieldProps {
-  formData: TaskFormState;
   handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
@@ -243,13 +236,6 @@ export type SimpleChangeEvent = {
 
 type FormChangeHandler = (e: SimpleChangeEvent) => void;
 
-export interface TaskNameFieldProps {
-  formData: TaskFormState;
-  handleChange: FormChangeHandler;
-  error?: boolean;
-  helperText?: string;
-}
-
 export interface DatePickerSectionProps {
   formData: TaskFormState;
   handleChange: FormChangeHandler;
@@ -261,38 +247,6 @@ export interface ParentTaskSelectProps {
   projectTasks: Task[];
   handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   parentIdFromUrl?: string | null;
-}
-
-export interface TaskProgressFieldProps {
-  value: number;
-  handleChange: (e: SimpleChangeEvent) => void;
-}
-
-export interface TaskTagsSectionProps {
-  formData: TaskFormState;
-  handleChange: FormChangeHandler;
-}
-
-export interface TaskTypeSectionProps {
-  formData: TaskFormState;
-  handleChange: FormChangeHandler;
-}
-
-export interface EstimatedTimeFieldProps {
-  formData: TaskFormState;
-  handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}
-
-export interface TaskPrioritySelectProps {
-  formData: TaskFormState;
-  priorities: TaskPriority[];
-  handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}
-
-export interface TaskStatusSelectProps {
-  formData: TaskFormState;
-  statuses: TaskStatus[];
-  handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export interface UseTaskFormProps {

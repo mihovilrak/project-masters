@@ -5,7 +5,7 @@ FROM node:25.4.0-alpine3.23 AS frontend-builder
 WORKDIR /app/fe
 
 # Copy package and lock files
-COPY fe/package*.json fe/yarn.lock fe/tsconfig.json fe/.yarnrc fe/config-overrides.js ./
+COPY fe/package*.json fe/yarn.lock fe/tsconfig.json fe/.yarnrc fe/vite.config.ts fe/index.html ./
 
 # Install dependencies
 RUN yarn config set cache-folder /tmp/yarn-cache && \
@@ -14,15 +14,10 @@ RUN yarn config set cache-folder /tmp/yarn-cache && \
 
 # Copy source code
 COPY fe/src/ ./src/
-COPY fe/public/ ./public/
-
-# Set environment variables
-ENV NODE_OPTIONS=--openssl-legacy-provider
-ENV BABEL_ENV=production
 
 # Type check and build the frontend
 RUN yarn run type-check && \
-    yarn run build --verbose
+    yarn run build
 
 # Build backend
 FROM node:25.4.0-alpine3.23 AS backend-builder

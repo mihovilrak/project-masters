@@ -9,7 +9,7 @@ import {
   useTheme,
 } from '@mui/material';
 import { AccessTime } from '@mui/icons-material';
-import { format, isToday } from 'date-fns';
+import dayjs from 'dayjs';
 import { TimeLogCalendarGridProps } from '../../types/timeLog';
 
 const TimeLogCalendarGrid: React.FC<TimeLogCalendarGridProps> = ({
@@ -34,7 +34,7 @@ const TimeLogCalendarGrid: React.FC<TimeLogCalendarGridProps> = ({
               title={
                 <Box data-testid="timelog-tooltip">
                   <Typography variant="subtitle2">
-                    {format(day, 'MMMM d, yyyy')}
+                    {dayjs(day).format('MMMM D, YYYY')}
                   </Typography>
                   {(logs || []).map((log) => (
                     <Typography key={log?.id || Math.random()} variant="body2">
@@ -47,12 +47,12 @@ const TimeLogCalendarGrid: React.FC<TimeLogCalendarGridProps> = ({
             >
               <Paper
                 data-testid="timelog-day-paper"
-                elevation={isToday(day) ? 3 : 1}
+                elevation={dayjs(day).isSame(dayjs(), 'day') ? 3 : 1}
                 sx={{
                   p: 1,
                   height: '100px',
                   backgroundColor: getDayColor(totalHours),
-                  border: isToday(day)
+                  border: dayjs(day).isSame(dayjs(), 'day')
                     ? `2px solid ${theme.palette.primary.main}`
                     : 'none',
                   display: 'flex',
@@ -60,7 +60,9 @@ const TimeLogCalendarGrid: React.FC<TimeLogCalendarGridProps> = ({
                   position: 'relative',
                 }}
               >
-                <Typography variant="caption">{format(day, 'd')}</Typography>
+                <Typography variant="caption">
+                  {dayjs(day).format('D')}
+                </Typography>
                 <Chip
                   size="small"
                   icon={<AccessTime />}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   TypesAndRolesState,
   TaskType,
@@ -19,145 +19,152 @@ import {
   updateTaskType,
   createTaskType,
 } from '../../api/taskTypes';
+import { useAsyncResource } from '../common/useAsyncResource';
+
+interface TypesAndRolesData {
+  taskTypes: TaskType[];
+  activityTypes: ActivityType[];
+  roles: AdminRole[];
+}
+
+const EMPTY_DATA: TypesAndRolesData = {
+  taskTypes: [],
+  activityTypes: [],
+  roles: [],
+};
+
+// API rows expose the flag as either `active` or `is_active` depending on age of the record
+const withActive = <T extends { active?: boolean; is_active?: boolean }>(
+  rows: T[],
+): T[] => rows.map((r) => ({ ...r, active: r.active ?? r.is_active ?? false }));
 
 export const useTypesAndRoles = () => {
-  const [state, setState] = useState<TypesAndRolesState>({
-    activeTab: 0,
-    taskTypes: [],
-    activityTypes: [],
-    roles: [],
-    loading: true,
-    error: null,
-    dialogOpen: false,
-    selectedItem: null,
-  });
+  const [activeTab, setActiveTab] = useState(0);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<
+    TaskType | ActivityType | AdminRole | null
+  >(null);
+  const [mutating, setMutating] = useState(false);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async (): Promise<void> => {
-    try {
-      setState((prev) => ({ ...prev, loading: true }));
+  const {
+    data,
+    loading,
+    error: fetchError,
+    refetch: fetchData,
+  } = useAsyncResource<TypesAndRolesData>(
+    async (signal) => {
       const [taskTypesData, activityTypesData, rolesData] = await Promise.all([
-        getTaskTypes().then((data) =>
-          data.map((t: any) => ({
-            ...t,
-            active: t.active ?? t.is_active ?? false,
-          })),
-        ),
-        getActivityTypes().then((data) =>
-          data.map((t: any) => ({
-            ...t,
-            active: t.active ?? t.is_active ?? false,
-          })),
-        ),
-        getRoles(),
+        getTaskTypes(signal),
+        getActivityTypes(signal),
+        getRoles(signal),
       ]);
-
-      setState((prev) => ({
-        ...prev,
-        taskTypes: taskTypesData as TaskType[],
-        activityTypes: activityTypesData as ActivityType[],
+      return {
+        taskTypes: withActive(taskTypesData) as TaskType[],
+        activityTypes: withActive(activityTypesData) as ActivityType[],
         roles: rolesData as AdminRole[],
-        loading: false,
-      }));
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to fetch data',
-        loading: false,
-      }));
-    }
+      };
+    },
+    [],
+    { initialData: EMPTY_DATA, errorMessage: 'Failed to fetch data' },
+  );
+
+  const state: TypesAndRolesState = {
+    activeTab,
+    taskTypes: data.taskTypes,
+    activityTypes: data.activityTypes,
+    roles: data.roles,
+    loading: loading || mutating,
+    error: mutationError ?? fetchError,
+    dialogOpen,
+    selectedItem,
   };
 
   const handleTabChange = (
     _event: React.SyntheticEvent,
     newValue: number,
   ): void => {
-    setState((prev) => ({ ...prev, activeTab: newValue }));
+    setActiveTab(newValue);
   };
 
   const handleCreate = (): void => {
-    setState((prev) => ({ ...prev, dialogOpen: true, selectedItem: null }));
+    setDialogOpen(true);
+    setSelectedItem(null);
   };
 
   const handleEdit = (item: TaskType | ActivityType | AdminRole): void => {
-    setState((prev) => ({ ...prev, dialogOpen: true, selectedItem: item }));
+    setDialogOpen(true);
+    setSelectedItem(item);
   };
 
   const handleDialogClose = (): void => {
-    setState((prev) => ({ ...prev, dialogOpen: false, selectedItem: null }));
+    setDialogOpen(false);
+    setSelectedItem(null);
+  };
+
+  const runMutation = async (
+    mutate: () => Promise<void>,
+    fallbackMessage: string,
+  ): Promise<void> => {
+    try {
+      setMutating(true);
+      setMutationError(null);
+      await mutate();
+      await fetchData();
+    } catch (error) {
+      setMutationError(
+        error instanceof Error ? error.message : fallbackMessage,
+      );
+    } finally {
+      setMutating(false);
+    }
   };
 
   const handleSave = async (
     item: Partial<TaskType | ActivityType | AdminRole>,
   ): Promise<void> => {
-    try {
-      setState((prev) => ({ ...prev, loading: true }));
+    // Fall back to selectedItem.id so editing updates the record when the dialog omits it
+    const id = item.id ?? (selectedItem as { id?: number } | null)?.id;
+    const resolvedId = id != null ? Number(id) : undefined;
 
-      // Use item.id or selectedItem.id so we update existing record when editing (e.g. role dialog may not pass id)
-      const resolveId = (): number | undefined => {
-        const id = item.id ?? (state.selectedItem as { id?: number })?.id;
-        return id != null ? Number(id) : undefined;
-      };
-
-      if (state.activeTab === 0) {
-        const id = resolveId();
-        if (id != null) {
-          await updateTaskType(id, item as TaskType);
+    await runMutation(async () => {
+      if (activeTab === 0) {
+        if (resolvedId != null) {
+          await updateTaskType(resolvedId, item as TaskType);
         } else {
           await createTaskType(item as TaskType);
         }
-      } else if (state.activeTab === 1) {
-        const id = resolveId();
-        if (id != null) {
-          await updateActivityType(id, item as ActivityType);
+      } else if (activeTab === 1) {
+        if (resolvedId != null) {
+          await updateActivityType(resolvedId, item as ActivityType);
         } else {
           await createActivityType(item as ActivityType);
         }
-      } else if (state.activeTab === 2) {
+      } else if (activeTab === 2) {
         const roleData = item as Partial<AdminRole>;
-        const id = resolveId();
-        if (id != null) {
-          await updateRole(id, roleData);
+        if (resolvedId != null) {
+          await updateRole(resolvedId, roleData);
         } else {
           await createRole(roleData);
         }
       }
       handleDialogClose();
-      await fetchData();
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to save item',
-        loading: false,
-      }));
-    }
+    }, 'Failed to save item');
   };
 
-  const handleDelete = async (id: number): Promise<void> => {
-    try {
-      setState((prev) => ({ ...prev, loading: true }));
-      if (state.activeTab === 0) {
+  const handleDelete = async (id: number): Promise<void> =>
+    runMutation(async () => {
+      if (activeTab === 0) {
         await deleteTaskType(id);
-      } else if (state.activeTab === 1) {
+      } else if (activeTab === 1) {
         await deleteActivityType(id);
-      } else if (state.activeTab === 2) {
+      } else if (activeTab === 2) {
         await deleteRole(id);
       }
-      await fetchData();
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to delete item',
-        loading: false,
-      }));
-    }
-  };
+    }, 'Failed to delete item');
 
-  const handleRoleUpdate = async (updatedRole: AdminRole) => {
-    try {
+  const handleRoleUpdate = async (updatedRole: AdminRole): Promise<void> =>
+    runMutation(async () => {
       const roleToUpdate: Partial<AdminRole> = {
         id: updatedRole.id,
         name: updatedRole.name,
@@ -175,15 +182,7 @@ export const useTypesAndRoles = () => {
       };
 
       await updateRole(updatedRole.id, roleToUpdate);
-      await fetchData();
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to update role',
-        loading: false,
-      }));
-    }
-  };
+    }, 'Failed to update role');
 
   return {
     state,

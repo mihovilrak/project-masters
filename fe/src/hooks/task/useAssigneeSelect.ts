@@ -1,29 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useAsyncResource } from '../common/useAsyncResource';
 import { getProjectMembers } from '../../api/projects';
 import { ProjectMember } from '../../types/project';
-import logger from '../../utils/logger';
-import getApiErrorMessage from '../../utils/getApiErrorMessage';
+
+const EMPTY_MEMBERS: ProjectMember[] = [];
 
 export const useAssigneeSelect = (projectId?: number | null) => {
-  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchProjectMembers = async () => {
-      if (projectId) {
-        try {
-          setError(null);
-          const membersData = await getProjectMembers(projectId);
-          setProjectMembers(membersData);
-        } catch (err) {
-          logger.error('Error fetching project members:', err);
-          setError(getApiErrorMessage(err, 'Failed to load project members'));
-        }
-      }
-    };
-
-    fetchProjectMembers();
-  }, [projectId]);
+  const { data: projectMembers, error } = useAsyncResource<ProjectMember[]>(
+    (signal) => getProjectMembers(projectId as number, signal),
+    [projectId],
+    {
+      initialData: EMPTY_MEMBERS,
+      enabled: Boolean(projectId),
+      errorMessage: 'Failed to load project members',
+    },
+  );
 
   return {
     projectMembers,

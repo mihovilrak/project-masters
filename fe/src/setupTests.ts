@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
-import { TextEncoder, TextDecoder } from 'util';
 import { configure } from '@testing-library/react';
+import { server } from './__tests__/mocks/server';
 
 // Configure testing library
 configure({
@@ -88,130 +88,6 @@ global.MutationObserver = class MutationObserver {
   }
 };
 
-// Add TextEncoder and TextDecoder to global scope
-global.TextEncoder = TextEncoder;
-global.TextDecoder = TextDecoder as typeof global.TextDecoder;
-
-// Polyfill for ReadableStream FIRST (required by Response.body.getReader())
-// MSW needs Response.body to be a ReadableStream with getReader() method
-// This must be defined before Response polyfill
-if (typeof global.ReadableStream === 'undefined') {
-  (global as any).ReadableStream = class ReadableStream {
-    constructor(underlyingSource?: any) {
-      this._underlyingSource = underlyingSource;
-      this._controller = null;
-    }
-    private _underlyingSource: any;
-    private _controller: any;
-    getReader() {
-      return {
-        read: async () => {
-          // If we have underlying source, try to read from it
-          if (this._underlyingSource && this._underlyingSource.start) {
-            // This is a basic implementation - MSW will provide the actual stream
-            return { done: true, value: undefined };
-          }
-          return { done: true, value: undefined };
-        },
-        cancel: () => Promise.resolve(),
-        releaseLock: () => {},
-      };
-    }
-    cancel() {
-      return Promise.resolve();
-    }
-  };
-}
-
-// Polyfill for BroadcastChannel (required by MSW v2)
-if (typeof global.BroadcastChannel === 'undefined') {
-  (global as any).BroadcastChannel = class BroadcastChannel {
-    constructor(public name: string) {}
-    postMessage() {}
-    close() {}
-    addEventListener() {}
-    removeEventListener() {}
-  };
-}
-
-// Polyfill for Response, Request, Headers (required by MSW and its dependencies)
-// Must be set up AFTER ReadableStream so Response.body can use it
-// MSW's HttpResponse.json() creates Response objects - we need to ensure body.getReader() works
-if (typeof global.Response === 'undefined') {
-  try {
-    const fetch = require('node-fetch');
-    (global as any).Response = fetch.Response;
-    (global as any).Request = fetch.Request;
-    (global as any).Headers = fetch.Headers;
-  } catch (e) {
-    // Create Response that works with MSW - body must be ReadableStream
-    const ReadableStreamClass = (global as any).ReadableStream;
-    (global as any).Response = class Response {
-      body: any;
-      status: number;
-      statusText: string;
-      ok: boolean;
-      headers: any;
-      constructor(body?: any, init?: any) {
-        this.status = init?.status || 200;
-        this.statusText = init?.statusText || 'OK';
-        this.ok = this.status >= 200 && this.status < 300;
-        this.headers = new (global as any).Headers(init?.headers);
-        // Always ensure body is a ReadableStream with getReader()
-        if (body !== null && body !== undefined) {
-          if (typeof body === 'string') {
-            const encoder = new TextEncoder();
-            this.body = new ReadableStreamClass({
-              start(controller: any) {
-                controller.enqueue(encoder.encode(body));
-                controller.close();
-              },
-            });
-          } else if (body && typeof body.getReader === 'function') {
-            this.body = body;
-          } else {
-            this.body = new ReadableStreamClass();
-          }
-        } else {
-          this.body = new ReadableStreamClass();
-        }
-      }
-      static error() {
-        return new Response(null, { status: 0 });
-      }
-      static json(data: any) {
-        return new Response(JSON.stringify(data), {
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-    };
-    (global as any).Request = class Request {
-      constructor(
-        public url: string,
-        public init?: any,
-      ) {}
-    };
-    (global as any).Headers = class Headers {
-      constructor(public init?: any) {}
-    };
-  }
-}
-
-// Polyfill for TransformStream (required by MSW v2)
-if (typeof global.TransformStream === 'undefined') {
-  (global as any).TransformStream = class TransformStream {
-    constructor() {
-      this.readable = new (global as any).ReadableStream();
-      this.writable = {};
-    }
-    readable: any;
-    writable: any;
-  };
-  (global as any).WritableStream = class WritableStream {
-    constructor() {}
-  };
-}
-
 // Mock for MUI Popper positioning
 jest.mock('@mui/material/styles', () => {
   const originalModule = jest.requireActual('@mui/material/styles');
@@ -233,10 +109,6 @@ console.error = (...args) => {
   }
   originalConsoleError(...args);
 };
-
-// Setup MSW (Mock Service Worker) for API mocking in tests
-// Loading is intentionally fail-fast: tests must not run without HTTP mocks.
-const { server } = require('./__tests__/mocks/server');
 
 // Establish API mocking before all tests
 beforeAll(() => {

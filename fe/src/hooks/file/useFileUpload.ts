@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { uploadFile } from '../../api/files';
 import { TaskFile } from '../../types/file';
 import { AxiosProgressEvent } from 'axios';
+import { validateUploadFile } from '../../constants/uploads';
 
 export const useFileUpload = (
   taskId: number,
@@ -14,12 +15,19 @@ export const useFileUpload = (
   const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    const selectedFile = event.target.files?.[0];
+    const input = event.target;
+    const selectedFile = input.files?.[0];
     if (!selectedFile) return;
 
     try {
-      setUploading(true);
       setError(null);
+      const validationError = validateUploadFile(selectedFile);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+
+      setUploading(true);
 
       const formData = new FormData();
       formData.append('file', selectedFile);
@@ -37,13 +45,12 @@ export const useFileUpload = (
       if (response) {
         onFileUploaded(response);
       }
-
-      setProgress(0);
-      event.target.value = '';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload file');
     } finally {
       setUploading(false);
+      setProgress(0);
+      input.value = '';
     }
   };
 

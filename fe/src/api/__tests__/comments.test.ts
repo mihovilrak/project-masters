@@ -31,7 +31,9 @@ describe('Comments API', () => {
 
       const comments = await getTaskComments(1);
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/tasks/1/comments');
+      expect(mockedApi.get).toHaveBeenCalledWith('/tasks/1/comments', {
+        signal: undefined,
+      });
       expect(comments).toEqual([mockComment]);
     });
 

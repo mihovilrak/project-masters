@@ -1,7 +1,7 @@
 export interface Permission {
   id: number;
   name: string;
-  created_on: string;
+  created_on?: string;
 }
 
 export interface PrivateRouteProps {

@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import {
   getProfile,
   getRecentTasks,
   getRecentProjects,
   updateProfile,
 } from '../../api/profiles';
-import { User } from '../../types/user';
 import { Task } from '../../types/task';
 import { Project } from '../../types/project';
 import {
@@ -14,8 +13,8 @@ import {
   ProfileData,
 } from '../../types/profile';
 import { useNavigate } from 'react-router-dom';
+import { useAsyncResource } from '../common/useAsyncResource';
 import logger from '../../utils/logger';
-import getApiErrorMessage from '../../utils/getApiErrorMessage';
 
 const DEFAULT_STATS: ProfileStats = {
   totalTasks: 0,
@@ -24,60 +23,69 @@ const DEFAULT_STATS: ProfileStats = {
   totalHours: 0,
 };
 
+interface ProfileBundle {
+  profile: ProfileData | null;
+  recentTasks: Task[];
+  recentProjects: Project[];
+}
+
+const EMPTY_BUNDLE: ProfileBundle = {
+  profile: null,
+  recentTasks: [],
+  recentProjects: [],
+};
+
+const toStats = (profile: ProfileData | null): ProfileStats =>
+  profile
+    ? {
+        totalTasks: profile.total_tasks ?? 0,
+        completedTasks: profile.completed_tasks ?? 0,
+        activeProjects: profile.active_projects ?? 0,
+        totalHours: profile.total_hours ?? 0,
+      }
+    : DEFAULT_STATS;
+
 export const useProfileData = () => {
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [recentTasks, setRecentTasks] = useState<Task[]>([]);
-  const [recentProjects, setRecentProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<ProfileStats>(DEFAULT_STATS);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
 
   const navigate = useNavigate();
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const profileData = await getProfile();
-
+  const {
+    data: { profile, recentTasks, recentProjects },
+    loading,
+    error,
+    refetch: fetchData,
+  } = useAsyncResource<ProfileBundle>(
+    async (signal) => {
+      const profileData = await getProfile(signal);
       if (!profileData) {
-        setError('Profile data not found');
-        setLoading(false);
-        return;
+        throw new Error('Profile data not found');
       }
 
-      setProfile(profileData);
-
-      setStats({
-        totalTasks: profileData.total_tasks ?? 0,
-        completedTasks: profileData.completed_tasks ?? 0,
-        activeProjects: profileData.active_projects ?? 0,
-        totalHours: profileData.total_hours ?? 0,
-      });
-
       const [tasksData, projectsData] = await Promise.all([
-        getRecentTasks().catch((err) => {
+        getRecentTasks(signal).catch((err) => {
           logger.error('Failed to fetch recent tasks:', err);
           return [];
         }),
-        getRecentProjects().catch((err) => {
+        getRecentProjects(signal).catch((err) => {
           logger.error('Failed to fetch recent projects:', err);
           return [];
         }),
       ]);
 
-      setRecentTasks(tasksData || []);
-      setRecentProjects(projectsData || []);
-    } catch (err: unknown) {
-      logger.error('Error fetching profile data:', err);
-      setError(getApiErrorMessage(err, 'Failed to load profile data'));
-    } finally {
-      setLoading(false);
-    }
-  };
+      return {
+        profile: profileData,
+        recentTasks: tasksData || [],
+        recentProjects: projectsData || [],
+      };
+    },
+    [],
+    { initialData: EMPTY_BUNDLE, errorMessage: 'Failed to load profile data' },
+  );
+
+  const stats = useMemo(() => toStats(profile), [profile]);
 
   const handleProfileUpdate = async (updatedProfile: ProfileUpdateData) => {
     try {
@@ -95,24 +103,9 @@ export const useProfileData = () => {
     navigate(`/tasks/${taskId}`);
   };
 
-  const getTypedProfile = (): ProfileData | null => {
-    return profile;
-  };
+  const getTypedProfile = (): ProfileData | null => profile;
 
-  const getProfileStats = (): ProfileStats => {
-    if (!profile) return DEFAULT_STATS;
-
-    return {
-      totalTasks: profile.total_tasks ?? 0,
-      completedTasks: profile.completed_tasks ?? 0,
-      activeProjects: profile.active_projects ?? 0,
-      totalHours: profile.total_hours ?? 0,
-    };
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const getProfileStats = (): ProfileStats => stats;
 
   return {
     profile,

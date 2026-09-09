@@ -1,11 +1,13 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { SelectChangeEvent } from '@mui/material';
 import { useUserDialog } from '../useUserDialog';
-import { createUser, updateUser, fetchRoles } from '../../../api/users';
+import { createUser, updateUser } from '../../../api/users';
+import { getRoles } from '../../../api/roles';
 import { User } from '../../../types/user';
 
 // Mock the API calls
 jest.mock('../../../api/users');
+jest.mock('../../../api/roles');
 
 describe('useUserDialog', () => {
   const mockUser: User = {
@@ -33,7 +35,7 @@ describe('useUserDialog', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (fetchRoles as jest.Mock).mockResolvedValue(mockRoles);
+    (getRoles as jest.Mock).mockResolvedValue(mockRoles);
   });
 
   it('should initialize with default values when no user is provided', async () => {
@@ -57,7 +59,7 @@ describe('useUserDialog', () => {
     });
     expect(result.current.error).toBeNull();
     expect(result.current.roles).toEqual(mockRoles);
-    expect(fetchRoles).toHaveBeenCalled();
+    expect(getRoles).toHaveBeenCalled();
   });
 
   it('should initialize with user data when provided', async () => {
@@ -88,7 +90,7 @@ describe('useUserDialog', () => {
     );
 
     expect(result.current.rolesLoading).toBe(true);
-    expect(fetchRoles).toHaveBeenCalled();
+    expect(getRoles).toHaveBeenCalled();
 
     await waitFor(() => {
       expect(result.current.rolesLoading).toBe(false);
@@ -97,9 +99,33 @@ describe('useUserDialog', () => {
     expect(result.current.roles).toEqual(mockRoles);
   });
 
+  it('does not reset edited fields when roles finish loading', async () => {
+    let resolveRoles: (roles: typeof mockRoles) => void = () => undefined;
+    (getRoles as jest.Mock).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRoles = resolve;
+      }),
+    );
+    const { result } = renderHook(() =>
+      useUserDialog(null, true, mockOnClose, mockOnUserSaved),
+    );
+
+    act(() => {
+      result.current.handleTextChange({
+        target: { name: 'name', value: 'Typed while loading' },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    await act(async () => {
+      resolveRoles(mockRoles);
+    });
+
+    expect(result.current.formData.name).toBe('Typed while loading');
+    expect(result.current.roles).toEqual(mockRoles);
+  });
+
   it('should handle roles fetch error', async () => {
     const error = new Error('Failed to fetch roles');
-    (fetchRoles as jest.Mock).mockRejectedValueOnce(error);
+    (getRoles as jest.Mock).mockRejectedValueOnce(error);
 
     const { result } = renderHook(() =>
       useUserDialog(null, true, mockOnClose, mockOnUserSaved),

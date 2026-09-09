@@ -1,11 +1,5 @@
 import { useState } from 'react';
-import {
-  startOfMonth,
-  endOfMonth,
-  eachDayOfInterval,
-  addMonths,
-  subMonths,
-} from 'date-fns';
+import dayjs from 'dayjs';
 import { TimeLog } from '../../types/timeLog';
 import { useTheme } from '@mui/material';
 
@@ -15,11 +9,10 @@ export const useTimeLogCalendar = (initialTimeLogs: TimeLog[] = []) => {
 
   const navigateMonth = (direction: 'next' | 'prev') => {
     setCurrentDate((current) => {
-      if (direction === 'next') {
-        return addMonths(current, 1);
-      } else {
-        return subMonths(current, 1);
-      }
+      const base = dayjs(current);
+      const shifted =
+        direction === 'next' ? base.add(1, 'month') : base.subtract(1, 'month');
+      return shifted.toDate();
     });
   };
 
@@ -58,9 +51,10 @@ export const useTimeLogCalendar = (initialTimeLogs: TimeLog[] = []) => {
   };
 
   const getCalendarDays = () => {
-    const start = startOfMonth(currentDate);
-    const end = endOfMonth(currentDate);
-    return eachDayOfInterval({ start, end });
+    const month = dayjs(currentDate).startOf('month');
+    return Array.from({ length: month.daysInMonth() }, (_, index) =>
+      month.date(index + 1).toDate(),
+    );
   };
 
   const getTotalMonthHours = (timeLogs: TimeLog[]): number => {

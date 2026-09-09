@@ -20,6 +20,7 @@ const ActivityTypesTable: React.FC<ActivityTypesTableProps> = ({
   activityTypes,
   onEdit,
   loading,
+  canManage = true,
 }) => {
   if (loading) {
     return (
@@ -75,6 +76,7 @@ const ActivityTypesTable: React.FC<ActivityTypesTableProps> = ({
                   onClick={() => onEdit(activityType)}
                   size="small"
                   aria-label="Edit activity type"
+                  disabled={!canManage}
                 >
                   <EditIcon />
                 </IconButton>

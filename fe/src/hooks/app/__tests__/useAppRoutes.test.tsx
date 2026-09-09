@@ -3,7 +3,6 @@ import {
   useTaskFileWrapper,
   useTimeLogCalendarWrapper,
   useTaskTimeLogsWrapper,
-  useAppState,
 } from '../useAppRoutes';
 import { getTaskById } from '../../../api/tasks';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -143,7 +142,10 @@ describe('useTaskTimeLogsWrapper', () => {
     expect(result.current.task).toBeNull();
 
     await waitFor(() => {
-      expect(mockedGetTaskById).toHaveBeenCalledWith(1);
+      expect(mockedGetTaskById).toHaveBeenCalledWith(
+        1,
+        expect.any(AbortSignal),
+      );
       expect(result.current.task).toEqual(mockTask);
     });
   });
@@ -160,68 +162,5 @@ describe('useTaskTimeLogsWrapper', () => {
       );
       expect(result.current.task).toBeNull();
     });
-  });
-});
-
-describe('useAppState', () => {
-  it('should initialize with taskFormOpen as false', () => {
-    const { result } = renderHook(() => useAppState());
-
-    expect(result.current.taskFormOpen).toBe(false);
-  });
-
-  it('should handle task creation correctly', async () => {
-    const { result } = renderHook(() => useAppState());
-
-    act(() => {
-      result.current.setTaskFormOpen(true);
-    });
-    expect(result.current.taskFormOpen).toBe(true);
-
-    await act(async () => {
-      await result.current.handleTaskCreated({
-        id: 1,
-        name: 'New Task',
-        project_id: 1,
-        project_name: 'Test Project',
-        holder_id: 1,
-        holder_name: 'Test Holder',
-        assignee_id: 1,
-        assignee_name: 'Test Assignee',
-        parent_id: null,
-        parent_name: null,
-        description: 'Test Description',
-        type_id: 1,
-        type_name: 'Test Type',
-        status_id: 1,
-        status_name: 'Test Status',
-        priority_id: 1,
-        priority_name: 'Test Priority',
-        start_date: null,
-        due_date: null,
-        end_date: null,
-        spent_time: 0,
-        progress: 0,
-        created_by: 1,
-        created_by_name: 'Test Creator',
-        created_on: new Date().toISOString(),
-        estimated_time: null,
-      });
-    });
-    expect(result.current.taskFormOpen).toBe(false);
-  });
-
-  it('should handle form close correctly', () => {
-    const { result } = renderHook(() => useAppState());
-
-    act(() => {
-      result.current.setTaskFormOpen(true);
-    });
-    expect(result.current.taskFormOpen).toBe(true);
-
-    act(() => {
-      result.current.handleTaskFormClose();
-    });
-    expect(result.current.taskFormOpen).toBe(false);
   });
 });

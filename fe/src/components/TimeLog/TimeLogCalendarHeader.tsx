@@ -5,7 +5,7 @@ import {
   NavigateBefore,
   NavigateNext,
 } from '@mui/icons-material';
-import { format } from 'date-fns';
+import dayjs from 'dayjs';
 import { TimeLogCalendarHeaderProps } from '../../types/timeLog';
 
 const TimeLogCalendarHeader: React.FC<TimeLogCalendarHeaderProps> = ({
@@ -35,7 +35,9 @@ const TimeLogCalendarHeader: React.FC<TimeLogCalendarHeaderProps> = ({
             <NavigateBefore />
           </IconButton>
           <Typography variant="h6" sx={{ mx: 2 }}>
-            {currentDate ? format(currentDate, 'MMMM yyyy') : 'Invalid Date'}
+            {currentDate
+              ? dayjs(currentDate).format('MMMM YYYY')
+              : 'Invalid Date'}
           </Typography>
           <IconButton
             onClick={() => onNavigateMonth('next')}

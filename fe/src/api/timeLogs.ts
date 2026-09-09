@@ -1,69 +1,52 @@
 import { api } from './api';
 import { TimeLog, TimeLogCreate, TimeSpent } from '../types/timeLog';
-import logger from '../utils/logger';
 
 // Get all time logs (admin only)
 export const getAllTimeLogs = async (): Promise<TimeLog[]> => {
-  try {
-    const response = await api.get('/time-logs');
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to fetch time logs', error);
-    throw error;
-  }
+  const response = await api.get<TimeLog[]>('/time-logs');
+  return response.data;
 };
 
 // Get task time logs
-export const getTaskTimeLogs = async (taskId: number): Promise<TimeLog[]> => {
-  try {
-    const response = await api.get(`/time-logs/tasks/${taskId}/logs`);
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to fetch task time logs', error);
-    throw error;
-  }
+export const getTaskTimeLogs = async (
+  taskId: number,
+  signal?: AbortSignal,
+): Promise<TimeLog[]> => {
+  const response = await api.get<TimeLog[]>(`/time-logs/tasks/${taskId}/logs`, {
+    signal,
+  });
+  return response.data;
 };
 
 // Get task spent time
 export const getTaskSpentTime = async (taskId: number): Promise<TimeSpent> => {
-  try {
-    const response = await api.get(`/time-logs/tasks/${taskId}/spent-time`);
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to fetch task spent time', error);
-    throw error;
-  }
+  const response = await api.get<TimeSpent>(
+    `/time-logs/tasks/${taskId}/spent-time`,
+  );
+  return response.data;
 };
 
 // Get project time logs
 export const getProjectTimeLogs = async (
   projectId: number,
   params?: Record<string, any>,
+  signal?: AbortSignal,
 ): Promise<TimeLog[]> => {
-  try {
-    const response = await api.get(`/time-logs/projects/${projectId}/logs`, {
-      params,
-    });
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to fetch project time logs', error);
-    throw error;
-  }
+  const response = await api.get<TimeLog[]>(
+    `/time-logs/projects/${projectId}/logs`,
+    { params, signal },
+  );
+  return response.data;
 };
 
 // Get project spent time
 export const getProjectSpentTime = async (
   projectId: number,
 ): Promise<TimeSpent> => {
-  try {
-    const response = await api.get(
-      `/time-logs/projects/${projectId}/spent-time`,
-    );
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to fetch project spent time', error);
-    throw error;
-  }
+  const response = await api.get<TimeSpent>(
+    `/time-logs/projects/${projectId}/spent-time`,
+  );
+  return response.data;
 };
 
 // Create time log
@@ -71,31 +54,25 @@ export const createTimeLog = async (
   taskId: number,
   timeLog: TimeLogCreate,
 ): Promise<TimeLog> => {
-  try {
-    const response = await api.post(`/time-logs/tasks/${taskId}/logs`, {
-      log_date: timeLog.log_date,
-      spent_time: timeLog.spent_time,
-      description: timeLog.description ?? '',
-      activity_type_id: timeLog.activity_type_id,
-    });
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to create time log', error);
-    throw error;
-  }
+  const response = await api.post<TimeLog>(`/time-logs/tasks/${taskId}/logs`, {
+    log_date: timeLog.log_date,
+    spent_time: timeLog.spent_time,
+    description: timeLog.description ?? '',
+    activity_type_id: timeLog.activity_type_id,
+  });
+  return response.data;
 };
 
 // Get user time logs
 export const getUserTimeLogs = async (
   params?: Record<string, any>,
+  signal?: AbortSignal,
 ): Promise<TimeLog[]> => {
-  try {
-    const response = await api.get('/time-logs/user/logs', { params });
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to fetch user time logs', error);
-    throw error;
-  }
+  const response = await api.get<TimeLog[]>('/time-logs/user/logs', {
+    params,
+    signal,
+  });
+  return response.data;
 };
 
 // Update time log
@@ -103,26 +80,16 @@ export const updateTimeLog = async (
   timeLogId: number,
   timeLog: TimeLogCreate,
 ): Promise<TimeLog> => {
-  try {
-    const response = await api.put(`/time-logs/${timeLogId}`, {
-      log_date: timeLog.log_date,
-      spent_time: timeLog.spent_time,
-      description: timeLog.description,
-      activity_type_id: timeLog.activity_type_id,
-    });
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to update time log', error);
-    throw error;
-  }
+  const response = await api.put<TimeLog>(`/time-logs/${timeLogId}`, {
+    log_date: timeLog.log_date,
+    spent_time: timeLog.spent_time,
+    description: timeLog.description,
+    activity_type_id: timeLog.activity_type_id,
+  });
+  return response.data;
 };
 
 // Delete time log
 export const deleteTimeLog = async (timeLogId: number): Promise<void> => {
-  try {
-    await api.delete(`/time-logs/${timeLogId}`);
-  } catch (error) {
-    logger.error('Failed to delete time log', error);
-    throw error;
-  }
+  await api.delete<void>(`/time-logs/${timeLogId}`);
 };

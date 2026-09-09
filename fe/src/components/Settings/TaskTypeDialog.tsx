@@ -68,12 +68,12 @@ const IconSelector = ({ value, onChange }: IconSelectorProps) => {
             </Alert>
           )}
           <Grid container spacing={1} sx={{ p: 2 }}>
-            {(icons || []).map((iconName) => {
+            {(icons || []).map((iconName, index) => {
               const IconComponent = iconName
                 ? getIconComponent(iconName)
                 : null;
               return (
-                <Grid key={iconName || Math.random()} size={{ xs: 6, sm: 4 }}>
+                <Grid key={iconName ?? `icon-${index}`} size={{ xs: 6, sm: 4 }}>
                   <IconButton
                     onClick={() => {
                       if (iconName) {

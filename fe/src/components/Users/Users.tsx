@@ -25,8 +25,8 @@ import {
   getUsers,
   deleteUser,
   getUserStatuses,
-  fetchRoles,
 } from '../../api/users';
+import { getRoles } from '../../api/roles';
 import { usePermission } from '../../hooks/common/usePermission';
 import { User } from '../../types/user';
 import FilterPanel from '../common/FilterPanel';
@@ -94,7 +94,7 @@ const Users: React.FC = () => {
       try {
         const [statusesData, rolesData] = await Promise.all([
           getUserStatuses().catch(() => []),
-          fetchRoles().catch(() => []),
+          getRoles().catch(() => []),
         ]);
         setStatuses(statusesData);
         setRoles(rolesData);

@@ -74,6 +74,7 @@ export const useTaskForm = ({
   }, [fetchedProjectMembers]);
 
   useEffect(() => {
+    const controller = new AbortController();
     const loadTaskData = async () => {
       // If taskId exists, we're in edit mode
       if (!taskId) {
@@ -83,10 +84,12 @@ export const useTaskForm = ({
 
       try {
         setIsLoading(true);
-        const taskData = await getTaskById(Number(taskId));
+        const [taskData, taskTags] = await Promise.all([
+          getTaskById(Number(taskId), controller.signal),
+          getTaskTags(Number(taskId), controller.signal),
+        ]);
         if (taskData) {
           setIsEditing(true);
-          const taskTags = await getTaskTags(Number(taskId));
 
           // Format dates properly
           const formattedStartDate = taskData.start_date
@@ -115,25 +118,28 @@ export const useTaskForm = ({
           });
         }
       } catch (error) {
+        if (controller.signal.aborted) return;
         logger.error('Error loading task:', error);
         setIsEditing(false);
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) setIsLoading(false);
       }
     };
 
     const fetchData = async () => {
       try {
         const [statusesData, prioritiesData, tagsData] = await Promise.all([
-          getTaskStatuses(),
-          getPriorities(),
-          getTags(),
+          getTaskStatuses(controller.signal),
+          getPriorities(controller.signal),
+          getTags(controller.signal),
         ]);
 
+        if (controller.signal.aborted) return;
         setStatuses(statusesData || []);
         setPriorities(prioritiesData || []);
         setAvailableTags(tagsData || []);
       } catch (error: unknown) {
+        if (controller.signal.aborted) return;
         logger.error('Error fetching data:', error);
         setStatuses([]);
         setPriorities([]);
@@ -143,6 +149,7 @@ export const useTaskForm = ({
 
     loadTaskData();
     fetchData();
+    return () => controller.abort();
   }, [taskId, currentUserId]);
 
   const handleChange = async (e: {
