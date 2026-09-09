@@ -6,6 +6,7 @@ db/backup/
 .env
 .env.test
 **/dist/
+fe/build/
 **/coverage/
 *.log
 .cursorrules
