@@ -109,11 +109,9 @@ jobs:
             echo 'EMAIL_USER=ci@example.com'
             echo 'EMAIL_PASSWORD=ci_email_password'
             echo 'EMAIL_FROM=CI <ci@example.com>'
-            echo 'NOTIFICATION_RATE_LIMIT=100'
             echo 'LOG_LEVEL=info'
             # Secrets the app refuses to start without; random per run.
             echo "SESSION_SECRET=$(openssl rand -hex 32)"
-            echo "NOTIFICATION_API_KEY=$(openssl rand -hex 32)"
           } > .env
 
       - name: Start services with Docker Compose
