@@ -29,6 +29,12 @@
         </div>
         <div class="content">
             <p>Hello {{userName}},</p>
+            {{#if title}}
+            <p><strong>{{title}}</strong></p>
+            {{/if}}
+            {{#if message}}
+            <p>{{message}}</p>
+            {{/if}}
             <p>A new comment has been added to a task you're watching.</p>
             {{#if taskName}}
             <p><strong>Task:</strong> {{taskName}}</p>

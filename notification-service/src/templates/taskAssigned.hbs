@@ -23,6 +23,12 @@
         </div>
         <div class="content">
             <p>Hello {{userName}},</p>
+            {{#if title}}
+            <p><strong>{{title}}</strong></p>
+            {{/if}}
+            {{#if message}}
+            <p>{{message}}</p>
+            {{/if}}
             <p>You have been assigned to a new task.</p>
             {{#if taskName}}
             <p>Task Details:</p>

@@ -23,6 +23,9 @@
         </div>
         <div class="content">
             <p>Hello {{userName}},</p>
+            {{#if title}}
+            <p><strong>{{title}}</strong></p>
+            {{/if}}
             <p>You have a new notification.</p>
             {{#if message}}
             <p>{{message}}</p>

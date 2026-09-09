@@ -23,6 +23,9 @@
         </div>
         <div class="content">
             <p>Hello {{userName}},</p>
+            {{#if title}}
+            <p><strong>{{title}}</strong></p>
+            {{/if}}
             <p>There has been an update to a project you're involved with.</p>
             {{#if projectName}}
             <p>Project Details:</p>

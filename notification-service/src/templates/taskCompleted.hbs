@@ -29,6 +29,12 @@
         <div class="content">
             <div class="success-icon">&#10004;</div>
             <p>Hello {{userName}},</p>
+            {{#if title}}
+            <p><strong>{{title}}</strong></p>
+            {{/if}}
+            {{#if message}}
+            <p>{{message}}</p>
+            {{/if}}
             <p>Great news! A task has been completed.</p>
             {{#if taskName}}
             <p>Task Details:</p>
