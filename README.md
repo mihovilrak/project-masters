@@ -156,7 +156,6 @@ services:
       EMAIL_USER: some.email@gmail.com
       EMAIL_PASSWORD: apppassword
       EMAIL_FROM: Project Management <some.email@gmail.com>
-      NOTIFICATION_RATE_LIMIT: 100
       LOG_LEVEL: info
     ports:
       - "3000:80"
