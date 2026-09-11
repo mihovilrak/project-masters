@@ -5,6 +5,9 @@ create table if not exists user_settings (
     language varchar(255) not null default 'en',
     notifications_enabled boolean not null default true,
     email_notifications_enabled boolean not null default true,
-    created_on timestamp not null default current_timestamp,
-    updated_on timestamp not null default current_timestamp
+    created_on timestamptz not null default current_timestamp,
+    updated_on timestamptz not null default current_timestamp
 );
+alter table user_settings
+    alter column created_on type timestamptz,
+    alter column updated_on type timestamptz;

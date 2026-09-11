@@ -4,6 +4,7 @@ import {
   seedTestUser,
   cleanupTables,
   cookieHeader,
+  testPool,
 } from '../setup/integration.setup';
 
 let app: Express;
@@ -39,6 +40,23 @@ describe('Authentication Flow', () => {
       const response = await request(app).post('/api/login').send({
         login: 'testuser',
         password: 'wrongpassword',
+      });
+
+      expect(response.status).toBe(401);
+    });
+
+    it.each([
+      ['inactive', 2],
+      ['deleted', 3],
+    ])('should return 401 for a %s user', async (_label, statusId) => {
+      await testPool.query(
+        `UPDATE users SET status_id = $1 WHERE login = 'testuser'`,
+        [statusId],
+      );
+
+      const response = await request(app).post('/api/login').send({
+        login: 'testuser',
+        password: 'password123',
       });
 
       expect(response.status).toBe(401);

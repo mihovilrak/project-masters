@@ -4,6 +4,7 @@ import { config, validateConfig } from './config';
 import { pool } from './db';
 import { startServer, stopSmtpProbe } from './server';
 import { scheduleCleanup } from './jobs/cleanup';
+import { scheduleDueSoon } from './jobs/dueSoon';
 import { emailService } from './services/emailService';
 import { notificationService } from './services/notificationService';
 import { logger } from './utils/logger';
@@ -26,6 +27,7 @@ const initializeService = async (): Promise<void> => {
       await notificationService.processNewNotifications();
     });
     scheduleCleanup();
+    scheduleDueSoon();
     logger.info('Email processing scheduled');
   } catch (error) {
     logger.error({ err: error }, 'Service initialization failed');

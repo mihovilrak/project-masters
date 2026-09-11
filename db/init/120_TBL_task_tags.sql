@@ -5,3 +5,4 @@ create table if not exists task_tags (
     created_on timestamptz default current_timestamp not null,
     constraint task_tags_unique unique (task_id, tag_id)
 );
+create index if not exists task_tags_tag_idx on task_tags(tag_id);

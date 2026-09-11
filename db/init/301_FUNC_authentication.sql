@@ -15,6 +15,7 @@ begin
         u.role_id
     from users u
     where u.login = auth_login
+    and u.status_id = user_status_id('active')
     and u.password = crypt(auth_password, u.password);
 end;
 

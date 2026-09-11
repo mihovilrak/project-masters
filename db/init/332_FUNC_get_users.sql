@@ -1,7 +1,11 @@
+drop function if exists get_users(int, int, boolean);
+drop function if exists get_user_by_id(int);
+
 create or replace function get_users(
     p_status_id int default null,
     p_role_id int default null,
-    p_include_deleted boolean default false
+    p_include_deleted boolean default false,
+    p_id int default null
 )
 returns table (
     id int,
@@ -46,7 +50,9 @@ begin
         limit 1
     ) l on true
     where (p_include_deleted or ((p_status_id is null and u.status_id != user_status_id('deleted')) or u.status_id = p_status_id))
-    and (p_role_id is null or u.role_id = p_role_id);
+    and (p_role_id is null or u.role_id = p_role_id)
+    and (p_id is null or u.id = p_id)
+    order by u.id;
 
 end;
 

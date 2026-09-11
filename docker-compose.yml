@@ -2,12 +2,40 @@ x-db: &db
   POSTGRES_DB: ${POSTGRES_DB}
   POSTGRES_USER: ${POSTGRES_USER}
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-  ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+
+# The API and notification service connect as the non-superuser role that
+# the migrate service creates; the superuser is only used by db, migrate and backup.
+x-app-db: &app-db
+  POSTGRES_HOST: db
+  POSTGRES_DB: ${POSTGRES_DB}
+  POSTGRES_USER: ${APP_DB_USER:-pm_app}
+  POSTGRES_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD must be set}
+
+x-email: &email
+  EMAIL_ENABLED: ${EMAIL_ENABLED}
+  EMAIL_HOST: ${EMAIL_HOST}
+  EMAIL_PORT: ${EMAIL_PORT}
+  EMAIL_SECURE: ${EMAIL_SECURE}
+  EMAIL_USER: ${EMAIL_USER}
+  EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+  EMAIL_FROM: ${EMAIL_FROM}
 
 x-defaults: &defaults
   networks:
     - pm_network
   restart: always
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp:mode=1777
+
+x-app: &app
+  <<: *defaults
+  image: ${APP_IMAGE:-ghcr.io/mihovilrak/project-node:1.0.0}
+  user: nginx
 
 services:
   db:
@@ -15,11 +43,6 @@ services:
     image: postgres:18.1-alpine3.23
     container_name: pm_db
     user: postgres
-    read_only: true
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
     mem_limit: 512m
     cpus: 1.0
     environment:
@@ -27,7 +50,6 @@ services:
       PGTZ: ${TZ}
     volumes:
       - db_data:/var/lib/postgresql
-      - ./db/backup:/backups
     tmpfs:
       - /tmp:mode=1777
       - /var/run/postgresql:uid=70,gid=70,mode=0775
@@ -38,54 +60,116 @@ services:
       retries: 5
       start_period: 10s
 
-  app:
-    <<: *defaults
-    image: ${APP_IMAGE:-ghcr.io/mihovilrak/project-node:1.0.0}
-    container_name: pm_app
-    user: nginx
-    read_only: true
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    mem_limit: 1g
-    cpus: 2.0
+  # One-shot: applies db/init, (re)creates the app role and seeds the admin.
+  migrate:
+    <<: *app
+    container_name: pm_migrate
+    restart: "no"
+    mem_limit: 256m
+    command: ["/app/db/migrate.sh"]
     environment:
       <<: *db
       POSTGRES_HOST: db
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_PASSWORD_FORCE_RESET: ${ADMIN_PASSWORD_FORCE_RESET:-false}
+      APP_DB_USER: ${APP_DB_USER:-pm_app}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD must be set}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    container_name: pm_api
+    mem_limit: 512m
+    cpus: 1.0
+    command: ["node", "/app/api/index.js"]
+    environment:
+      <<: [*app-db, *email]
       NODE_ENV: ${NODE_ENV}
       SESSION_SECRET: ${SESSION_SECRET}
       FE_URL: ${FE_URL}
       APP_BASE_URL: ${APP_BASE_URL:-}
-      EMAIL_ENABLED: ${EMAIL_ENABLED}
-      EMAIL_HOST: ${EMAIL_HOST}
-      EMAIL_PORT: ${EMAIL_PORT}
-      EMAIL_SECURE: ${EMAIL_SECURE}
-      EMAIL_USER: ${EMAIL_USER}
-      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
-      EMAIL_FROM: ${EMAIL_FROM}
       LOG_LEVEL: ${LOG_LEVEL}
       UPLOADS_DIR: /app/uploads
       ENV_FILE_PATH: /app/config/.env
-    ports:
-      - "3000:8080"
     volumes:
       - app_uploads:/app/uploads
       - app_config:/app/config
-      - ./db/backup:/backups
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  notifications:
+    <<: *app
+    container_name: pm_notifications
+    mem_limit: 256m
+    cpus: 0.5
+    command: ["node", "/app/service/index.js"]
+    environment:
+      <<: [*app-db, *email]
+      NODE_ENV: ${NODE_ENV}
+      FE_URL: ${FE_URL}
+      APP_BASE_URL: ${APP_BASE_URL:-}
+      LOG_LEVEL: ${LOG_LEVEL}
+      ENV_FILE_PATH: /app/config/.env
+    volumes:
+      - app_config:/app/config
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5001/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    <<: *app
+    container_name: pm_web
+    mem_limit: 128m
+    cpus: 0.5
+    ports:
+      - "3000:8080"
     tmpfs:
       - /tmp:mode=1777
       - /var/cache/nginx:uid=101,gid=101,mode=0750
     healthcheck:
-      test:
-        - CMD-SHELL
-        - >-
-          wget -q -O /dev/null http://127.0.0.1:8080/api/health &&
-          wget -q -O /dev/null http://127.0.0.1:5001/ready
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 30s
+      start_period: 10s
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # Daily pg_dump at BACKUP_TIME (HH:MM, TZ) into ./db/backup on the host.
+  backup:
+    <<: *defaults
+    image: postgres:18.1-alpine3.23
+    container_name: pm_backup
+    user: postgres
+    mem_limit: 128m
+    cpus: 0.5
+    entrypoint: ["sh", "/scripts/backup-scheduler.sh"]
+    environment:
+      <<: *db
+      POSTGRES_HOST: db
+      BACKUP_TIME: ${BACKUP_TIME:-00:00}
+      TZ: ${TZ}
+    volumes:
+      - ./db/backup.sh:/scripts/backup.sh:ro
+      - ./db/backup-scheduler.sh:/scripts/backup-scheduler.sh:ro
+      - ./db/pgpass.sh:/scripts/pgpass.sh:ro
+      - ./db/backup:/backups
     depends_on:
       db:
         condition: service_healthy

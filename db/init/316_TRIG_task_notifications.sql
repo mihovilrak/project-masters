@@ -1,37 +1,16 @@
+-- Task Due Soon is not raised here: it depends on the calendar, not on a row
+-- change, so create_due_soon_notifications() sweeps for it on a schedule.
 create or replace function task_notification_trigger()
 returns trigger as $function$
 
 declare
     v_type_id smallint;
     v_done_id smallint;
-    v_closed_ids smallint[];
 
 begin
     -- Status ids are looked up by name: hard-coding them here is what made
     -- "deleted" mean two different numbers elsewhere in this schema.
     select id into v_done_id from task_statuses where name = 'Done';
-    select array_agg(id) into v_closed_ids
-    from task_statuses
-    where name in ('Done', 'Cancelled', 'Deleted');
-
-    -- Task Due Soon
-    -- due_date is a date, so comparing it to now() makes a task due today look
-    -- overdue; compare whole days instead.
-    if (TG_OP = 'INSERT' or NEW.due_date is distinct from OLD.due_date)
-        and NEW.due_date between current_date and current_date + 1
-        and not (NEW.status_id = any(coalesce(v_closed_ids, '{}'::smallint[])))
-    then
-        select id into v_type_id from notification_types where name = 'Task Due Soon';
-        if found and NEW.assignee_id is not null then
-            perform create_notification(
-                NEW.assignee_id,
-                v_type_id,
-                'Task Due Soon',
-                'Task ' || NEW.name || ' is due ' || NEW.due_date::text,
-                '/tasks/' || NEW.id
-            );
-        end if;
-    end if;
 
     -- Task Assigned
     if TG_OP = 'UPDATE' and NEW.assignee_id is not null
@@ -79,16 +58,13 @@ begin
         end if;
     end if;
 
-    return NEW;
-
-exception when others then
-    -- A notification is a side effect: it must never roll back the task write.
-    raise warning 'task_notification_trigger failed for task %: %', NEW.id, sqlerrm;
+    -- No exception handler: a failing notification should abort the write
+    -- rather than disappear into a warning nobody reads.
     return NEW;
 end;
 $function$ language plpgsql;
 
 create or replace trigger task_notifications
-    after insert or update on tasks
+    after update on tasks
     for each row
     execute function task_notification_trigger();

@@ -293,7 +293,7 @@ describe('ProjectModel', () => {
       expect(query).not.toContain('evil_key');
       // Only status mapped to status_id; project_id, assignee_id, priority_id
       const values = (mockPool.query as jest.Mock).mock.calls[0][1];
-      expect(values).toEqual(['1', null, 1, null, 500, 0]);
+      expect(values).toEqual(['1', null, [1], null, 500, 0]);
     });
   });
 

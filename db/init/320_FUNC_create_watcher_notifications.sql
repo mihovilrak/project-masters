@@ -1,9 +1,9 @@
-CREATE OR REPLACE FUNCTION create_watcher_notifications(
+create or replace function create_watcher_notifications(
     p_task_id integer,
     p_action_user_id integer,
     p_type_id smallint
 )
-RETURNS TABLE (
+returns table (
     id integer,
     user_id integer,
     type_id smallint,
@@ -15,80 +15,31 @@ RETURNS TABLE (
     active boolean,
     read_on timestamptz,
     created_on timestamptz
-) AS $function$
+) as $function$
 
-BEGIN
-    -- Verify notification type exists
-    IF NOT EXISTS (
-        SELECT 1
-        FROM notification_types notype
-        WHERE notype.id = p_type_id
-        ) THEN
-        RAISE EXCEPTION 'Invalid notification type ID: %', p_type_id;
-    END IF;
+declare
+    v_subject text;
+    v_watcher_ids integer[];
 
-    RETURN QUERY
-    WITH task_info AS (
-        SELECT
-            t.name as task_name,
-            t.description,
-            p.name as project_name,
-            u.name as action_user_name,
-            nt.name as type_name
-        FROM tasks t
-        JOIN projects p ON t.project_id = p.id
-        JOIN users u ON u.id = p_action_user_id
-        JOIN notification_types nt ON nt.id = p_type_id
-        WHERE t.id = p_task_id
-    )
-    INSERT INTO notifications (
-        user_id,
-        type_id,
-        title,
-        message,
-        link,
-        is_read,
-        active,
-        created_on
-    )
-    SELECT
-        w.user_id,
-        p_type_id,
-        CASE p_type_id
-            WHEN 3 THEN 'Task Updated'
-            WHEN 4 THEN 'New Comment'
-            WHEN 5 THEN 'Status Changed'
-            ELSE 'Task Notification'
-        END,
-        action_user_name || ' ' ||
-        CASE p_type_id
-            WHEN 3 THEN 'updated'
-            WHEN 4 THEN 'commented on'
-            WHEN 5 THEN 'changed status of'
-            ELSE 'modified'
-        END ||
-        ' task "' || task_name || '" in project "' || project_name || '"',
-        '/tasks/' || p_task_id,
-        false,
-        true,
-        CURRENT_TIMESTAMP
-    FROM watchers w
-    CROSS JOIN task_info
-    WHERE w.task_id = p_task_id
-    AND w.user_id != p_action_user_id
-    RETURNING
-        notifications.id,
-        notifications.user_id,
-        notifications.type_id,
-        notifications.title,
-        notifications.message,
-        notifications.link,
-        notifications.data,
-        notifications.is_read,
-        notifications.active,
-        notifications.read_on,
-        notifications.created_on;
+begin
+    select 'task "' || t.name || '" in project "' || p.name || '"'
+    into v_subject
+    from tasks t
+    join projects p on p.id = t.project_id
+    where t.id = p_task_id;
 
-END;
+    if not found then
+        return;
+    end if;
+
+    select array_agg(w.user_id) into v_watcher_ids
+    from watchers w
+    where w.task_id = p_task_id;
+
+    return query
+    select * from fan_out_notifications(
+        v_watcher_ids, p_action_user_id, p_type_id, v_subject, '/tasks/' || p_task_id
+    );
+end;
 
 $function$ language plpgsql;

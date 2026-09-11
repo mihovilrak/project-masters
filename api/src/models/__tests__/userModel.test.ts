@@ -121,7 +121,7 @@ describe('UserModel', () => {
       const result = await userModel.getUserById(mockPool, '1');
 
       expect(mockPool.query).toHaveBeenCalledWith(
-        'SELECT * FROM get_user_by_id($1)',
+        'SELECT * FROM get_users(p_id => $1)',
         ['1'],
       );
       expect(result).toEqual(mockUser);
@@ -223,7 +223,7 @@ describe('UserModel', () => {
 
       expect(mockPool.query).toHaveBeenCalledTimes(1);
       expect(mockPool.query).toHaveBeenCalledWith(
-        'SELECT * FROM get_user_by_id($1)',
+        'SELECT * FROM get_users(p_id => $1)',
         ['1'],
       );
       expect(result).toEqual(mockUser);

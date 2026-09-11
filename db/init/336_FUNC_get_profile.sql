@@ -42,20 +42,17 @@ begin
     left join (
         select assignee_id, count(*)::bigint as total_tasks
         from tasks
-        where not exists (
-            select 1 from (values
-                (task_status_id('done')),
-                (task_status_id('cancelled')),
-                (task_status_id('deleted'))
-            ) as excluded(status_id)
-            where tasks.status_id = excluded.status_id
-        )
+        where status_id <> all (array[
+            task_status_id('done'),
+            task_status_id('cancelled'),
+            task_status_id('deleted')
+        ])
         group by assignee_id
     ) tu on tu.assignee_id = u.id
     left join (
         select assignee_id, count(*)::bigint as completed_tasks
         from tasks
-        where status_id = 5
+        where status_id = task_status_id('done')
         group by assignee_id
     ) ct on ct.assignee_id = u.id
     left join (

@@ -45,13 +45,12 @@ begin
             u.name as created_by_name,
             p.created_on,
             coalesce(proj_estimated_time, 0) as estimated_time,
-            coalesce(pst.spent_time, 0) as spent_time,
+            get_spent_time(p_project_id => p.id) as spent_time,
             coalesce(pp.progress, 0)::numeric as progress
           from projects p
           left join projects pt on pt.id = p.parent_id
           left join project_statuses ps on ps.id = p.status_id
           left join users u on u.id = p.created_by
-          left join lateral get_project_spent_time(p.id) pst on true
           left join lateral get_project_progress(p.id) pp on true
           where p.id = proj_id;
 

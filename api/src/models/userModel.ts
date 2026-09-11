@@ -51,7 +51,7 @@ export const getUserById = async (
   pool: Pool,
   id: string,
 ): Promise<User | null> => {
-  const result = await pool.query('SELECT * FROM get_user_by_id($1)', [id]);
+  const result = await pool.query('SELECT * FROM get_users(p_id => $1)', [id]);
   return result.rows[0] || null;
 };
 

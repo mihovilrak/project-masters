@@ -85,27 +85,19 @@ FROM nginx:1.29.4-alpine3.23
 # Copy built applications
 WORKDIR /app
 
-# Copy and set up startup script
-COPY start-app.sh /start-app.sh
-COPY db/backup.sh /usr/local/bin/backup.sh
-COPY db/seed-admin.sh /app/seed-admin.sh
-COPY db/pg_dump_cron /app/crontabs/nginx
-
-# Install dependencies and set up startup script
+# One image, one process per compose service: nginx (default CMD), the API,
+# the notification service and the one-shot db migration (db/migrate.sh).
 RUN apk add --no-cache \
-    dcron \
     nodejs \
     npm \
     postgresql-client && \
-    chmod +x /start-app.sh && \
-    mkdir -p api service db-init uploads config /backups /app/crontabs && \
-    chmod +x /usr/local/bin/backup.sh && \
-    chmod +x /app/seed-admin.sh && \
-    chmod 0600 /app/crontabs/nginx && \
-    chown -R nginx:nginx /app /backups /var/cache/nginx
+    mkdir -p api service uploads config && \
+    chown -R nginx:nginx /app /var/cache/nginx
 
-# Copy database init scripts
-COPY db/init/ ./db-init/
+# Database migrations and helper scripts
+COPY db/init/ ./db/init/
+COPY --chmod=755 db/migrate.sh db/seed-admin.sh ./db/
+COPY db/pgpass.sh db/app-role.sql ./db/
 
 # Copy built applications
 COPY --from=frontend-builder /app/fe/build /usr/share/nginx/html
@@ -119,11 +111,11 @@ COPY fe/nginx.conf /etc/nginx/nginx.conf
 # Both are volume-backed: the rest of the filesystem is read-only at runtime.
 ENV UPLOADS_DIR=/app/uploads
 ENV ENV_FILE_PATH=/app/config/.env
+ENV TEMPLATES_PATH=/app/service/templates
 
 # 8080 nginx, 5000 api, 5001 notification service
 EXPOSE 8080 5000 5001
 
 USER nginx
 
-# Start the application
-CMD ["/start-app.sh"]
+CMD ["nginx", "-g", "daemon off;"]

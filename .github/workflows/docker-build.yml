@@ -98,6 +98,7 @@ jobs:
             echo 'POSTGRES_USER=pm_user'
             echo 'POSTGRES_DB=pm_db'
             echo 'POSTGRES_PASSWORD=ci_postgres_password'
+            echo 'APP_DB_PASSWORD=ci_app_password'
             echo 'ADMIN_PASSWORD=ci_admin_password'
             echo 'TZ=UTC'
             echo 'NODE_ENV=production'
@@ -114,8 +115,12 @@ jobs:
             echo "SESSION_SECRET=$(openssl rand -hex 32)"
           } > .env
 
+      # The backup service runs as the postgres user (uid 70).
       - name: Start services with Docker Compose
-        run: docker compose up -d
+        run: |
+          mkdir -p db/backup
+          sudo chown 70:70 db/backup
+          docker compose up -d
 
       - name: Wait for database to be ready
         run: |
@@ -160,6 +165,10 @@ jobs:
             echo "Expected 401 from /api/login, got $login_status"
             exit 1
           fi
+
+          echo "Testing backup..."
+          docker compose exec -T backup sh /scripts/backup.sh
+          sudo sh -c 'gzip -t db/backup/db_dump_*.sql.gz'
 
           echo "All services are running correctly!"
 

@@ -1,23 +1,15 @@
+-- The 'Admin' permission implies every other permission.
 create or replace function permission_check(
     user_id integer,
     required_permission character varying
 )
 returns boolean as $function$
-declare
-    p_check boolean;
-begin
-    -- First check if user is admin - if yes, allow everything
-    if (select is_admin(user_id)) then
-        return true;
-    end if;
-
-    -- If not admin, check specific permissions
     select exists (
         select 1
-        from get_user_permissions(user_id)
-        where permission = required_permission
-    ) into p_check;
-
-    return p_check;
-end;
-$function$ language plpgsql;
+        from users u
+        join roles_permissions rp on rp.role_id = u.role_id
+        join permissions p on p.id = rp.permission_id
+        where u.id = user_id
+        and p.name in ('Admin', required_permission)
+    );
+$function$ language sql stable;

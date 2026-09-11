@@ -55,7 +55,7 @@ describe('CommentModel', () => {
       const result = await commentModel.getTaskComments(mockPool, '1');
 
       expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('get_task_comments'),
+        expect.stringContaining('get_comments(p_task_id'),
         ['1'],
       );
       expect(result).toEqual(mockComments);
@@ -118,7 +118,7 @@ describe('CommentModel', () => {
       const result = await commentModel.commentWithUser(mockPool, '1');
 
       expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('get_comment_by_id'),
+        expect.stringContaining('get_comments(p_id'),
         ['1'],
       );
       expect(result).toEqual(commentWithUser);

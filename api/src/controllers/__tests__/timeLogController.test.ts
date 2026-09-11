@@ -150,7 +150,7 @@ describe('TimeLogController', () => {
 
   describe('getTaskSpentTime', () => {
     it('should return task spent time', async () => {
-      const mockSpentTime = { total_spent: 5.5 };
+      const mockSpentTime = { spent_time: 5.5 };
       mockReq.params = { taskId: '1' };
       (timeLogModel.getTaskSpentTime as jest.Mock).mockResolvedValue(
         mockSpentTime,
@@ -232,7 +232,7 @@ describe('TimeLogController', () => {
 
   describe('getProjectSpentTime', () => {
     it('should return project spent time', async () => {
-      const mockSpentTime = { total_spent: 15.5 };
+      const mockSpentTime = { spent_time: 15.5 };
       mockReq.params = { projectId: '1' };
       (timeLogModel.getProjectSpentTime as jest.Mock).mockResolvedValue(
         mockSpentTime,

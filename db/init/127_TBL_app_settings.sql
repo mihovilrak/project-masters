@@ -6,7 +6,10 @@ create table if not exists app_settings (
     time_zone varchar(255) not null default 'Europe/Zagreb',
     theme varchar(255) not null default 'light',
     welcome_message text not null default '<h1>Welcome to Project Management App!</h1>',
-    created_on timestamp not null default current_timestamp,
-    updated_on timestamp not null default current_timestamp,
+    created_on timestamptz not null default current_timestamp,
+    updated_on timestamptz not null default current_timestamp,
     constraint single_row check (id = 1)
 );
+alter table app_settings
+    alter column created_on type timestamptz,
+    alter column updated_on type timestamptz;

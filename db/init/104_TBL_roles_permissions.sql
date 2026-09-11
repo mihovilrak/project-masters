@@ -5,3 +5,4 @@ create table if not exists roles_permissions (
     created_on timestamptz default current_timestamp not null,
     constraint roles_permissions_unique unique (role_id, permission_id)
 );
+create index if not exists roles_permissions_permission_idx on roles_permissions(permission_id);

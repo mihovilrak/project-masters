@@ -179,22 +179,25 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
       - name: Initialize test database
-        run: |
-          set -euo pipefail
-          for f in ../db/init/*.sql; do
-            echo "Applying $f"
-            PGPASSWORD=pm_password psql -v ON_ERROR_STOP=1 -h localhost -U pm_user -d pm_test -f "$f"
-          done
+        run: sh ../db/migrate.sh
         env:
-          PGHOST: localhost
-          PGPORT: 5432
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: pm_test
+          POSTGRES_USER: pm_user
+          POSTGRES_PASSWORD: pm_password
+          APP_DB_USER: pm_app
+          APP_DB_PASSWORD: pm_app_password
 
+      # The app connects as the non-superuser role, as in production.
       - name: Run integration tests
         run: yarn test:integration
         env:
           TEST_DB_HOST: localhost
           TEST_DB_PORT: 5432
           TEST_DB_NAME: pm_test
-          TEST_DB_USER: pm_user
-          TEST_DB_PASSWORD: pm_password
+          TEST_DB_USER: pm_app
+          TEST_DB_PASSWORD: pm_app_password
+          TEST_DB_ADMIN_USER: pm_user
+          TEST_DB_ADMIN_PASSWORD: pm_password
           SESSION_SECRET: test-session-secret

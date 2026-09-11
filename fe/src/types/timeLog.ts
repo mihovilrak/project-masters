@@ -35,7 +35,6 @@ export interface TimeLogCreate {
 }
 
 export interface TimeSpent {
-  task_id: number;
   spent_time: number;
 }
 

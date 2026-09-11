@@ -28,7 +28,7 @@ A modern, full-stack project management application built with React, TypeScript
 
 - Node.js
 - TypeScript
-- PostgreSQL 17
+- PostgreSQL 18
 - Docker for containerization
 
 ### Services
@@ -61,19 +61,12 @@ project_management_app/
 3. Start the application using Docker:
 
 ```bash
-./start-app.sh
+docker compose up -d
 ```
 
-Or manually:
+On Linux, make the backup directory writable by the `backup` service first: `mkdir -p db/backup && sudo chown 70:70 db/backup`.
 
-```bash
-docker-compose up -d
-```
-
-The application will be available at:
-
-- Frontend: <http://localhost:3000>
-- Backend API: <http://localhost:5000>
+The application will be available at <http://localhost:3000> (the API is proxied under `/api`).
 
 ## 💻 Development
 
@@ -95,78 +88,26 @@ npm run dev
 
 ## 🔒 Environment Variables
 
-Key environment variables needed:
+Key environment variables needed (see [.env.example](.env.example)):
 
-- `POSTGRES_DB`: Database name
-- `POSTGRES_USER`: Database user
-- `POSTGRES_PASSWORD`: Database password
+- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`: Database and its owner (used only for migrations and backups)
+- `APP_DB_PASSWORD` (required), `APP_DB_USER` (default `pm_app`): Non-superuser role the api and notification service connect as
+- `ADMIN_PASSWORD`: Password of the default `admin` user, created on first start
+- `BACKUP_TIME`: Daily backup time, `HH:MM` in `TZ` (default `00:00`)
 - `SESSION_SECRET`: Session encryption key
 - `EMAIL_*`: Email service configuration
 - `NODE_ENV`: Environment (development/production)
 
 ## 🐳 Docker
 
-The application is containerized using Docker and includes:
+[docker-compose.yml](docker-compose.yml) runs one image as several services:
 
-- PostgreSQL database
-- Node.js application server
-- Frontend static file serving
-- Notification service
-
-### docker-compose.yml example
-
-```yaml
-x-db: &db
-  POSTGRES_DB: pm_db
-  POSTGRES_USER: pm_user
-  POSTGRES_PASSWORD: pm_password
-
-x-defaults: &defaults
-  networks:
-    - pm_network
-  restart: always
-
-services:
-  db:
-    <<: *defaults
-    image: postgres:18.1-alpine3.23
-    container_name: pm_db
-    environment:
-      <<: *db
-      PGTZ: Europe/Zagreb
-    volumes:
-      - ./db/db_data:/var/lib/postgresql/data
-      - ./db/backup:/backups
-    ports:
-      - "5432:5432"
-
-  app:
-    <<: *defaults
-    image: pm:alpine
-    container_name: pm_app
-    environment:
-      <<: *db
-      POSTGRES_HOST: db
-      NODE_ENV: production
-      SESSION_SECRET: opensslgeneratedsessionsecret
-      EMAIL_ENABLED: true
-      EMAIL_HOST: smtp.gmail.com
-      EMAIL_PORT: 587
-      EMAIL_SECURE: false
-      EMAIL_USER: some.email@gmail.com
-      EMAIL_PASSWORD: apppassword
-      EMAIL_FROM: Project Management <some.email@gmail.com>
-      LOG_LEVEL: info
-    ports:
-      - "3000:80"
-      - "5000:5000"
-    depends_on:
-      - db
-
-networks:
-  pm_network:
-    driver: bridge
-```
+- `db`: PostgreSQL (no port exposed to the host)
+- `migrate`: one-shot; applies `db/init`, creates the app role and seeds the admin, then exits
+- `api`: Express API
+- `notifications`: notification/email service
+- `web`: nginx serving the frontend and proxying `/api` to `api` (port 3000)
+- `backup`: daily `pg_dump` into `./db/backup`
 
 ## 🧪 Running integration tests locally
 
@@ -181,14 +122,14 @@ yarn setup-test-db
 yarn test:integration:local
 ```
 
-- **setup-test-db**: Starts a Postgres container (`pm_test_db`) on port **5433**, runs all `db/init/*.sql` scripts.
+- **setup-test-db**: Starts a Postgres container (`pm_test_db`) on port **5433** and runs `db/migrate.sh` in it (schema, app role `pm_app`).
 - **test:integration:local**: Loads **.env.test** and runs integration tests (no env vars in package.json).
 
 To run tests with custom env: set `TEST_DB_*` and `SESSION_SECRET` in `.env.test`, or run `yarn test:integration` with env set in your shell.
 
-## Database backup and admin seed
+## Database migrations, backups and admin seed
 
-See [db/README.md](db/README.md) for backup script usage, cron setup (install [db/backup.sh](db/backup.sh) to the path used by cron; set `POSTGRES_*` in the cron environment), and admin user seeding. Set `ADMIN_PASSWORD` in the app environment to create/update the default admin user after DB init (run by [start-app.sh](start-app.sh) after init).
+See [db/README.md](db/README.md).
 
 ## 📝 License
 

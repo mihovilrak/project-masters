@@ -1,14 +1,24 @@
+drop function if exists get_tasks(
+    int, int, int, int, smallint, smallint, smallint, int, boolean, int,
+    date, date, date, date, date, date, numeric, numeric, boolean,
+    smallint[], smallint[], int[], int[], int[], smallint[], int[]
+);
+
+-- Call with named arguments. Plain SQL so it is inlined into the caller: the
+-- caller's access filter, ORDER BY and LIMIT/OFFSET are planned together with
+-- these filters, and every call shape gets its own plan.
 create or replace function get_tasks(
     p_id int default null,
-    p_project_id int default null,
-    p_assignee_id int default null,
-    p_holder_id int default null,
-    p_status_id smallint default null,
-    p_priority_id smallint default null,
-    p_type_id smallint default null,
     p_parent_id int default null,
+    p_project_ids int[] default null,
+    p_assignee_ids int[] default null,
+    p_holder_ids int[] default null,
+    p_status_ids smallint[] default null,
+    p_priority_ids smallint[] default null,
+    p_type_ids smallint[] default null,
+    p_created_by_ids int[] default null,
     p_active_statuses_only boolean default false,
-    p_created_by int default null,
+    p_inactive_statuses_only boolean default false,
     p_due_date_from date default null,
     p_due_date_to date default null,
     p_start_date_from date default null,
@@ -16,15 +26,7 @@ create or replace function get_tasks(
     p_created_from date default null,
     p_created_to date default null,
     p_estimated_time_min numeric default null,
-    p_estimated_time_max numeric default null,
-    p_inactive_statuses_only boolean default false,
-    p_status_ids smallint[] default null,
-    p_priority_ids smallint[] default null,
-    p_assignee_ids int[] default null,
-    p_holder_ids int[] default null,
-    p_project_ids int[] default null,
-    p_type_ids smallint[] default null,
-    p_created_by_ids int[] default null
+    p_estimated_time_max numeric default null
 )
 returns table (
     id int,
@@ -58,10 +60,6 @@ returns table (
     created_on timestamp with time zone,
     estimated_time numeric
 ) as $function$
-
-begin
-
-    return query
     select
         t.id,
         t.name,
@@ -87,7 +85,7 @@ begin
         t.start_date,
         t.due_date,
         t.end_date,
-        tst.spent_time,
+        (select sum(tl.spent_time) from time_logs tl where tl.task_id = t.id)::numeric as spent_time,
         t.progress,
         t.created_by,
         c.name as created_by_name,
@@ -101,35 +99,26 @@ begin
     left join task_types tt on tt.id = t.type_id
     left join task_statuses ts on ts.id = t.status_id
     left join priorities pi on pi.id = t.priority_id
-    left join (
-        select distinct pt.id, pt.name
-        from tasks t2
-        join tasks pt on pt.id = t2.parent_id
-        where t2.parent_id is not null
-    ) pt on pt.id = t.parent_id
-    left join (
-        select tl.task_id, sum(tl.spent_time)::numeric as spent_time
-        from time_logs tl
-        group by tl.task_id
-    ) tst on tst.task_id = t.id
+    left join tasks pt on pt.id = t.parent_id
     where (p_id is null or t.id = p_id)
-    and ((p_project_id is null and (p_project_ids is null or t.project_id = any(p_project_ids))) or t.project_id = p_project_id)
-    and ((p_assignee_id is null and (p_assignee_ids is null or t.assignee_id = any(p_assignee_ids))) or t.assignee_id = p_assignee_id)
-    and ((p_holder_id is null and (p_holder_ids is null or t.holder_id = any(p_holder_ids))) or t.holder_id = p_holder_id)
-    and ((p_status_id is null and (p_status_ids is null or t.status_id = any(p_status_ids))) or t.status_id = p_status_id)
-    and ((p_priority_id is null and (p_priority_ids is null or t.priority_id = any(p_priority_ids))) or t.priority_id = p_priority_id)
-    and ((p_type_id is null and (p_type_ids is null or t.type_id = any(p_type_ids))) or t.type_id = p_type_id)
     and (p_parent_id is null or t.parent_id = p_parent_id)
-    and ((p_created_by is null and (p_created_by_ids is null or t.created_by = any(p_created_by_ids))) or t.created_by = p_created_by)
-    and (
-      (p_inactive_statuses_only and t.status_id in (
-        task_status_id('done'), task_status_id('cancelled'), task_status_id('deleted')
-      ))
-      or (not p_inactive_statuses_only and (not p_active_statuses_only or t.status_id in (
-        task_status_id('new'), task_status_id('in_progress'),
-        task_status_id('on_hold'), task_status_id('review')
-      )))
-    )
+    and (p_project_ids is null or t.project_id = any(p_project_ids))
+    and (p_assignee_ids is null or t.assignee_id = any(p_assignee_ids))
+    and (p_holder_ids is null or t.holder_id = any(p_holder_ids))
+    and (p_status_ids is null or t.status_id = any(p_status_ids))
+    and (p_priority_ids is null or t.priority_id = any(p_priority_ids))
+    and (p_type_ids is null or t.type_id = any(p_type_ids))
+    and (p_created_by_ids is null or t.created_by = any(p_created_by_ids))
+    and case
+        when p_inactive_statuses_only then t.status_id in (
+            task_status_id('done'), task_status_id('cancelled'), task_status_id('deleted')
+        )
+        when p_active_statuses_only then t.status_id in (
+            task_status_id('new'), task_status_id('in_progress'),
+            task_status_id('on_hold'), task_status_id('review')
+        )
+        else true
+    end
     and (p_due_date_from is null or t.due_date >= p_due_date_from)
     and (p_due_date_to is null or t.due_date <= p_due_date_to)
     and (p_start_date_from is null or t.start_date >= p_start_date_from)
@@ -138,7 +127,4 @@ begin
     and (p_created_to is null or t.created_on::date <= p_created_to)
     and (p_estimated_time_min is null or t.estimated_time >= p_estimated_time_min)
     and (p_estimated_time_max is null or t.estimated_time <= p_estimated_time_max);
-
-end;
-
-$function$ language plpgsql;
+$function$ language sql stable;

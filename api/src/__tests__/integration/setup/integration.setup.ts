@@ -26,12 +26,15 @@ beforeAll(async () => {
     );
   }
 
+  // The app under test connects as TEST_DB_USER (the non-superuser app role).
+  // Seeding and TRUNCATE need the owner, so the fixture pool can use another role.
   testPool = new Pool({
     host: process.env.TEST_DB_HOST || 'localhost',
     port: parseInt(process.env.TEST_DB_PORT || '5432'),
     database: process.env.TEST_DB_NAME || 'pm_test',
-    user: process.env.TEST_DB_USER || 'pm_user',
-    password: process.env.TEST_DB_PASSWORD,
+    user:
+      process.env.TEST_DB_ADMIN_USER || process.env.TEST_DB_USER || 'pm_user',
+    password: process.env.TEST_DB_ADMIN_PASSWORD || process.env.TEST_DB_PASSWORD,
   });
 
   // Test connection

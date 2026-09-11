@@ -147,9 +147,10 @@ export const getProjectSpentTime = async (
   pool: Pool,
   projectId: string,
 ): Promise<SpentTime> => {
-  const result = await pool.query('SELECT * FROM get_project_spent_time($1)', [
-    projectId,
-  ]);
+  const result = await pool.query(
+    'SELECT get_spent_time(p_project_id => $1)::float8 AS spent_time',
+    [projectId],
+  );
   return result.rows[0];
 };
 
@@ -173,8 +174,9 @@ export const getTaskSpentTime = async (
   pool: Pool,
   taskId: string,
 ): Promise<SpentTime> => {
-  const result = await pool.query('SELECT * FROM get_task_spent_time($1)', [
-    taskId,
-  ]);
+  const result = await pool.query(
+    'SELECT get_spent_time(p_task_id => $1)::float8 AS spent_time',
+    [taskId],
+  );
   return result.rows[0];
 };

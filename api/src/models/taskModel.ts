@@ -29,15 +29,11 @@ const accessFilter = (
     ? ''
     : `WHERE project_id IN (${accessibleProjectsSubquery(index)})`;
 
-/** Normalize number | number[] into single and array for get_tasks. */
-function singleOrArray(val: number | number[] | null | undefined): {
-  single: number | null;
-  arr: number[] | null;
-} {
-  if (val == null) return { single: null, arr: null };
-  if (Array.isArray(val))
-    return { single: null, arr: val.length > 0 ? val : null };
-  return { single: val, arr: null };
+/** Normalize number | number[] into the array form get_tasks takes. */
+function toArray(val: number | number[] | null | undefined): number[] | null {
+  if (val == null) return null;
+  if (Array.isArray(val)) return val.length > 0 ? val : null;
+  return [val];
 }
 
 // Get all tasks (get_tasks params include date ranges and created_by)
@@ -104,49 +100,41 @@ export const getTasks = async (
   const active_statuses_only =
     explicit_active_only || (!hasFilters && !inactive_statuses_only);
 
-  const proj = singleOrArray(project_id as number | number[] | null);
-  const assignee = singleOrArray(assignee_id as number | number[] | null);
-  const holder = singleOrArray(holder_id as number | number[] | null);
-  const status = singleOrArray(status_id as number | number[] | null);
-  const priority = singleOrArray(priority_id as number | number[] | null);
-  const type = singleOrArray(type_id as number | number[] | null);
-  const createdBy = singleOrArray(created_by as number | number[] | null);
+  // Only the filters that are set are passed, by name.
+  const args = (
+    [
+      ['p_id', id],
+      ['p_parent_id', parent_id],
+      ['p_project_ids', toArray(project_id as number | number[] | null)],
+      ['p_assignee_ids', toArray(assignee_id as number | number[] | null)],
+      ['p_holder_ids', toArray(holder_id as number | number[] | null)],
+      ['p_status_ids', toArray(status_id as number | number[] | null)],
+      ['p_priority_ids', toArray(priority_id as number | number[] | null)],
+      ['p_type_ids', toArray(type_id as number | number[] | null)],
+      ['p_created_by_ids', toArray(created_by as number | number[] | null)],
+      ['p_active_statuses_only', active_statuses_only || null],
+      ['p_inactive_statuses_only', inactive_statuses_only || null],
+      ['p_due_date_from', due_date_from],
+      ['p_due_date_to', due_date_to],
+      ['p_start_date_from', start_date_from],
+      ['p_start_date_to', start_date_to],
+      ['p_created_from', created_from],
+      ['p_created_to', created_to],
+      ['p_estimated_time_min', estimated_time_min],
+      ['p_estimated_time_max', estimated_time_max],
+    ] as [string, unknown][]
+  ).filter(([, value]) => value != null);
 
   const scoped = scopeUserId != null;
-  const where = accessFilter(scopeUserId, 27);
-  const page = paginationClause(pagination, scoped ? 28 : 27);
+  const where = accessFilter(scopeUserId, args.length + 1);
+  const page = paginationClause(pagination, args.length + (scoped ? 2 : 1));
   const result: QueryResult<TaskDetails> = await pool.query(
-    `SELECT * FROM get_tasks($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+    `SELECT * FROM get_tasks(${args.map(([name], i) => `${name} => $${i + 1}`).join(', ')})
      ${where}
      ORDER BY id
      ${page.clause}`,
     [
-      id ?? null,
-      proj.single,
-      assignee.single,
-      holder.single,
-      status.single,
-      priority.single,
-      type.single,
-      parent_id ?? null,
-      active_statuses_only,
-      createdBy.single ?? null,
-      due_date_from ?? null,
-      due_date_to ?? null,
-      start_date_from ?? null,
-      start_date_to ?? null,
-      created_from ?? null,
-      created_to ?? null,
-      estimated_time_min ?? null,
-      estimated_time_max ?? null,
-      inactive_statuses_only,
-      status.arr,
-      priority.arr,
-      assignee.arr,
-      holder.arr,
-      proj.arr,
-      type.arr,
-      createdBy.arr,
+      ...args.map(([, value]) => value),
       ...(scoped ? [scopeUserId] : []),
       ...page.values,
     ],
@@ -160,7 +148,7 @@ export const getTaskById = async (
   id: string,
 ): Promise<TaskDetails | null> => {
   const result: QueryResult<TaskDetails> = await pool.query(
-    'SELECT * FROM get_tasks($1, null, null, null, null, null, null, null, false, null, null, null, null, null, null, null, null, null, false, null, null, null, null, null, null, null)',
+    'SELECT * FROM get_tasks(p_id => $1)',
     [id],
   );
   return result.rows[0] || null;
@@ -314,7 +302,7 @@ export const getActiveTasks = async (
   userId: string,
 ): Promise<TaskDetails[]> => {
   const result: QueryResult<TaskDetails> = await pool.query(
-    'SELECT * FROM get_tasks(null, null, $1, null, null, null, null, null, true, null, null, null, null, null, null, null, null, null, false, null, null, null, null, null, null, null)',
+    'SELECT * FROM get_tasks(p_assignee_ids => ARRAY[$1::int], p_active_statuses_only => true)',
     [userId],
   );
   return result.rows;
@@ -331,7 +319,7 @@ export const getTasksByProject = async (
   const where = accessFilter(scopeUserId, 2);
   const page = paginationClause(pagination, scoped ? 3 : 2);
   const result: QueryResult<TaskDetails> = await pool.query(
-    `SELECT * FROM get_tasks(null, $1, null, null, null, null, null, null, false, null, null, null, null, null, null, null, null, null, false, null, null, null, null, null, null, null)
+    `SELECT * FROM get_tasks(p_project_ids => ARRAY[$1::int])
      ${where}
      ORDER BY created_on DESC, id DESC
      ${page.clause}`,
@@ -357,7 +345,7 @@ export const getTasksByDateRange = async (
     conditions.push(`project_id IN (${accessibleProjectsSubquery(3)})`);
   }
   const result: QueryResult<TaskDetails> = await pool.query(
-    `SELECT * FROM get_tasks(null, null, null, null, null, null, null, null, false, null, null, null, null, null, null, null, null, null, false, null, null, null, null, null, null, null)
+    `SELECT * FROM get_tasks()
      WHERE ${conditions.join(' AND ')}
      ORDER BY start_date NULLS LAST, id`,
     [startDate, endDate, ...(scoped ? [scopeUserId] : [])],
@@ -371,7 +359,7 @@ export const getSubtasks = async (
   parentId: string,
 ): Promise<TaskDetails[]> => {
   const result: QueryResult<TaskDetails> = await pool.query(
-    `SELECT * FROM get_tasks(null, null, null, null, null, null, null, $1, false, null, null, null, null, null, null, null, null, null, false, null, null, null, null, null, null, null)
+    `SELECT * FROM get_tasks(p_parent_id => $1)
      ORDER BY created_on ASC`,
     [parentId],
   );

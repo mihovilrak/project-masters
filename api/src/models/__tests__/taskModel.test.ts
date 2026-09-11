@@ -51,37 +51,9 @@ describe('TaskModel', () => {
 
       const result = await taskModel.getTasks(mockPool);
 
-      const expectedNoFilter = [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        true,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        false,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-      ];
       expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('get_tasks'),
-        [...expectedNoFilter, 500, 0],
+        expect.stringContaining('get_tasks(p_active_statuses_only => $1)'),
+        [true, 500, 0],
       );
       expect(result).toEqual(mockTasks);
     });
@@ -96,37 +68,11 @@ describe('TaskModel', () => {
         whereParams: { project_id: 1, status_id: 1 },
       });
 
-      const expectedWithFilter = [
-        null,
-        1,
-        null,
-        null,
-        1,
-        null,
-        null,
-        null,
-        false,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        false,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-      ];
       expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('get_tasks'),
-        [...expectedWithFilter, 500, 0],
+        expect.stringContaining(
+          'get_tasks(p_project_ids => $1, p_status_ids => $2)',
+        ),
+        [[1], [1], 500, 0],
       );
       expect(result).toEqual(mockTasks);
     });
@@ -136,37 +82,9 @@ describe('TaskModel', () => {
 
       const result = await taskModel.getTasks(mockPool);
 
-      const expectedNoFilter = [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        true,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        false,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-      ];
       expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('get_tasks'),
-        [...expectedNoFilter, 500, 0],
+        expect.stringContaining('get_tasks(p_active_statuses_only => $1)'),
+        [true, 500, 0],
       );
       expect(result).toEqual([]);
     });
@@ -182,9 +100,9 @@ describe('TaskModel', () => {
         priority_id: [2, 3],
       });
 
-      const args = (mockPool.query as jest.Mock).mock.calls[0][1];
-      expect(args[19]).toEqual([1, 2]);
-      expect(args[20]).toEqual([2, 3]);
+      const [sql, args] = (mockPool.query as jest.Mock).mock.calls[0];
+      expect(sql).toContain('get_tasks(p_status_ids => $1, p_priority_ids => $2)');
+      expect(args).toEqual([[1, 2], [2, 3], 500, 0]);
       expect(result).toEqual(mockTasks);
     });
   });
@@ -429,10 +347,9 @@ describe('TaskModel', () => {
 
       const [sql, params] = (mockPool.query as jest.Mock).mock.calls[0];
       expect(sql).toContain('WHERE project_id IN');
-      expect(sql).toContain('$27');
-      expect(sql).toContain('LIMIT $28 OFFSET $29');
-      expect(params).toHaveLength(29);
-      expect(params.slice(26)).toEqual(['7', 500, 0]);
+      expect(sql).toContain('$2');
+      expect(sql).toContain('LIMIT $3 OFFSET $4');
+      expect(params).toEqual([true, '7', 500, 0]);
     });
 
     it('leaves the query unscoped when no user is given', async () => {

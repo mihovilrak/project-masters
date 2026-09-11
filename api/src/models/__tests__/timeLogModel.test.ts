@@ -162,7 +162,7 @@ describe('TimeLogModel', () => {
 
   describe('getProjectSpentTime', () => {
     it('should return project spent time', async () => {
-      const mockSpentTime = { total_spent: 10.5 };
+      const mockSpentTime = { spent_time: 10.5 };
       (mockPool.query as jest.Mock).mockResolvedValue({
         rows: [mockSpentTime],
       } as QueryResult);
@@ -188,7 +188,7 @@ describe('TimeLogModel', () => {
 
   describe('getTaskSpentTime', () => {
     it('should return task spent time', async () => {
-      const mockSpentTime = { total_spent: 5.5 };
+      const mockSpentTime = { spent_time: 5.5 };
       (mockPool.query as jest.Mock).mockResolvedValue({
         rows: [mockSpentTime],
       } as QueryResult);

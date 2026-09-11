@@ -11,18 +11,19 @@ returns table(
     uploaded_on timestamp with time zone,
     uploaded_by text
 ) as $function$
-
-begin
-
-    return query
-    SELECT
-      f.*,
-      u.name || ' ' || u.surname as uploaded_by
-    FROM files f
-    LEFT JOIN users u ON f.user_id = u.id
-    WHERE f.task_id = $1
-    ORDER BY f.uploaded_on DESC;
-
-end;
-
-$function$ language plpgsql;
+    select
+        f.id,
+        f.task_id,
+        f.user_id,
+        f.original_name,
+        f.stored_name,
+        f.size,
+        f.mime_type,
+        f.file_path,
+        f.uploaded_on,
+        u.name || ' ' || u.surname as uploaded_by
+    from files f
+    left join users u on f.user_id = u.id
+    where f.task_id = t_id
+    order by f.uploaded_on desc;
+$function$ language sql stable;

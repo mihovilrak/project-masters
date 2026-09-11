@@ -19,7 +19,7 @@ class EmailService implements IEmailService {
   constructor() {
     this.transporter = EmailService.createTransport();
     this.templates = {};
-    // start-app.sh sets TEMPLATES_PATH; the fallback matches the compiled
+    // The Docker image sets TEMPLATES_PATH; the fallback matches the compiled
     // layout, where templates sit beside services/ under dist/.
     this.templateDir =
       process.env.TEMPLATES_PATH ?? path.join(__dirname, '..', 'templates');

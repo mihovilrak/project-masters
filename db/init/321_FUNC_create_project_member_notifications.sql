@@ -1,9 +1,9 @@
-CREATE OR REPLACE FUNCTION create_project_member_notifications(
+create or replace function create_project_member_notifications(
     p_project_id integer,
     p_action_user_id integer,
     p_type_id smallint
 )
-RETURNS TABLE (
+returns table (
     id integer,
     user_id integer,
     type_id smallint,
@@ -15,76 +15,30 @@ RETURNS TABLE (
     active boolean,
     read_on timestamptz,
     created_on timestamptz
-) AS $function$
+) as $function$
 
-BEGIN
-    -- Verify notification type exists
-    IF NOT EXISTS (
-        SELECT 1
-        FROM notification_types notype
-        WHERE notype.id = p_type_id
-        ) THEN
-        RAISE EXCEPTION 'Invalid notification type ID: %', p_type_id;
-    END IF;
+declare
+    v_subject text;
+    v_member_ids integer[];
 
-    RETURN QUERY
-    WITH project_info AS (
-        SELECT
-            p.name as project_name,
-            p.description,
-            u.name as action_user_name,
-            nt.name as type_name
-        FROM projects p
-        JOIN users u ON u.id = p_action_user_id
-        JOIN notification_types nt ON nt.id = p_type_id
-        WHERE p.id = p_project_id
-    )
-    INSERT INTO notifications (
-        user_id,
-        type_id,
-        title,
-        message,
-        link,
-        is_read,
-        active,
-        created_on
-    )
-    SELECT
-        pu.user_id,
-        p_type_id,
-        CASE p_type_id
-            WHEN 6 THEN 'Project Updated'
-            WHEN 8 THEN 'Added to Project'
-            ELSE 'Project Notification'
-        END,
-        action_user_name || ' ' ||
-        CASE p_type_id
-            WHEN 6 THEN 'updated'
-            WHEN 8 THEN 'added to'
-            ELSE 'modified'
-        END ||
-        ' project "' || project_name || '"',
-        '/projects/' || p_project_id,
-        false,
-        true,
-        CURRENT_TIMESTAMP
-    FROM project_users pu
-    CROSS JOIN project_info
-    WHERE pu.project_id = p_project_id
-    AND pu.user_id != p_action_user_id
-    RETURNING
-        notifications.id,
-        notifications.user_id,
-        notifications.type_id,
-        notifications.title,
-        notifications.message,
-        notifications.link,
-        notifications.data,
-        notifications.is_read,
-        notifications.active,
-        notifications.read_on,
-        notifications.created_on;
+begin
+    select 'project "' || p.name || '"'
+    into v_subject
+    from projects p
+    where p.id = p_project_id;
 
-END;
+    if not found then
+        return;
+    end if;
+
+    select array_agg(pu.user_id) into v_member_ids
+    from project_users pu
+    where pu.project_id = p_project_id;
+
+    return query
+    select * from fan_out_notifications(
+        v_member_ids, p_action_user_id, p_type_id, v_subject, '/projects/' || p_project_id
+    );
+end;
 
 $function$ language plpgsql;

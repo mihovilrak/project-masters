@@ -1,11 +1,12 @@
+-- Admin is whoever holds the 'Admin' permission, the same check the API makes.
 create or replace function is_admin(user_id integer)
 returns boolean as $function$
-declare is_admin boolean;
-begin
     select exists (
-        select 1 from users u
-        where u.id = user_id and u.role_id = 1
-    ) into is_admin;
-    return is_admin;
-end;
-$function$ language plpgsql;
+        select 1
+        from users u
+        join roles_permissions rp on rp.role_id = u.role_id
+        join permissions p on p.id = rp.permission_id
+        where u.id = user_id
+        and p.name = 'Admin'
+    );
+$function$ language sql stable;

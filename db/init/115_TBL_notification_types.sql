@@ -5,3 +5,8 @@ create table if not exists notification_types (
     color varchar(7) not null,
     created_on timestamptz default current_timestamp not null
 );
+-- Title and verb of the messages built by fan_out_notifications(), kept here
+-- so a new type cannot fall through to a generic message.
+alter table notification_types
+    add column if not exists title varchar(100),
+    add column if not exists verb varchar(50);

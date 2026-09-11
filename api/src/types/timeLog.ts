@@ -31,5 +31,5 @@ export interface TimeLogQueryFilters {
 }
 
 export interface SpentTime {
-  total_spent_time: number;
+  spent_time: number;
 }

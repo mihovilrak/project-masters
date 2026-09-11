@@ -6,9 +6,10 @@ export const getTaskComments = async (
   pool: Pool,
   taskId: string,
 ): Promise<CommentWithUser[]> => {
-  const result = await pool.query('SELECT * FROM get_task_comments($1)', [
-    taskId,
-  ]);
+  const result = await pool.query(
+    'SELECT * FROM get_comments(p_task_id => $1)',
+    [taskId],
+  );
   return result.rows;
 };
 
@@ -33,7 +34,9 @@ export const commentWithUser = async (
   pool: Pool,
   id: string,
 ): Promise<CommentWithUser | null> => {
-  const result = await pool.query('SELECT * FROM get_comment_by_id($1)', [id]);
+  const result = await pool.query('SELECT * FROM get_comments(p_id => $1)', [
+    id,
+  ]);
   return result.rows[0] || null;
 };
 
@@ -58,7 +61,9 @@ export const editComment = async (
   }
 
   // Fetch the updated comment with user details
-  const result = await pool.query('SELECT * FROM get_comment_by_id($1)', [id]);
+  const result = await pool.query('SELECT * FROM get_comments(p_id => $1)', [
+    id,
+  ]);
 
   return result.rows[0] || null;
 };

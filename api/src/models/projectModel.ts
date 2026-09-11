@@ -261,13 +261,20 @@ export const getProjectTasks = async (
   const page = paginationClause(pagination, 5);
   const result: QueryResult<ProjectTask> = await pool.query(
     `SELECT * FROM get_tasks(
-      null, $1, $2, null, $3, $4, null, null, false,
-      null, null, null, null, null, null, null, null, null, false,
-      null, null, null, null, null, null, null
+      p_project_ids => ARRAY[$1::int],
+      p_assignee_ids => $2::int[],
+      p_status_ids => $3::smallint[],
+      p_priority_ids => $4::smallint[]
     )
     ORDER BY created_on DESC, id DESC
     ${page.clause}`,
-    [projectId, assignee_id, status_id, priority_id, ...page.values],
+    [
+      projectId,
+      assignee_id != null ? [assignee_id] : null,
+      status_id != null ? [status_id] : null,
+      priority_id != null ? [priority_id] : null,
+      ...page.values,
+    ],
   );
   return result.rows;
 };

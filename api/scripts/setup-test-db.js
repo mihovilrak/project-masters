@@ -1,24 +1,24 @@
 /**
- * Start a dedicated test Postgres in Docker and run db/init/*.sql.
+ * Start a dedicated test Postgres in Docker and run db/migrate.sh inside it.
  * Run from api/: yarn setup-test-db
  * Requires: Docker. No .env or existing Postgres needed.
- * Uses: container pm_test_db, port 5433, user pm_user, password pm_password,
- * db pm_test.
+ * Uses: container pm_test_db, port 5433, db pm_test, owner pm_user/pm_password,
+ * app role pm_app/pm_app_password.
  */
 
 const path = require('path');
-const fs = require('fs');
-const { spawnSync, execSync } = require('child_process');
+const { spawnSync } = require('child_process');
 
 const CONTAINER = 'pm_test_db';
 const IMAGE = 'postgres:18.1-alpine3.23';
 const PORT = 5433;
 const USER = 'pm_user';
 const PASSWORD = 'pm_password';
+const APP_USER = 'pm_app';
+const APP_PASSWORD = 'pm_app_password';
 const DB = 'pm_test';
 
-const repoRoot = path.join(__dirname, '..', '..');
-const initDir = path.join(repoRoot, 'db', 'init');
+const dbDir = path.join(__dirname, '..', '..', 'db');
 
 function run(cmd, args, opts = {}) {
   const r = spawnSync(cmd, args, { stdio: 'inherit', ...opts });
@@ -94,62 +94,56 @@ function main() {
     }
   }
 
-  let files;
-  try {
-    files = fs.readdirSync(initDir)
-      .filter((f) => f.endsWith('.sql'))
-      .sort();
-  } catch (err) {
-    console.error('Cannot read db/init:', initDir, err.message);
-    process.exit(1);
+  // Same migration path as production: tracked db/init scripts plus the app role.
+  console.log('Running db/migrate.sh...');
+  docker(['exec', CONTAINER, 'rm', '-rf', '/tmp/db']);
+  docker(['exec', CONTAINER, 'mkdir', '/tmp/db']);
+  for (const entry of ['init', 'migrate.sh', 'pgpass.sh', 'app-role.sql', 'seed-admin.sh']) {
+    docker(['cp', path.join(dbDir, entry), CONTAINER + ':/tmp/db/' + entry]);
   }
-
-  if (files.length === 0) {
-    console.log('No .sql files in db/init');
-    printNext();
-    return;
-  }
-
-  console.log('Running %d init scripts...', files.length);
-  for (const file of files) {
-    const filePath = path.join(initDir, file);
-    const sql = fs.readFileSync(filePath, 'utf8');
-    const proc = spawnSync('docker', [
-      'exec',
-      '-i',
-      CONTAINER,
-      'psql',
-      '-U',
-      USER,
-      '-d',
-      DB,
-      '-v',
-      'ON_ERROR_STOP=1',
-    ], { input: sql, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
-    if (proc.status !== 0) {
-      console.error('%s failed:', file);
-      if (proc.stderr) process.stderr.write(proc.stderr);
-      process.exit(1);
-    }
-    console.log('  %s', file);
-  }
+  docker([
+    'exec',
+    '-e', 'POSTGRES_HOST=127.0.0.1',
+    '-e', 'POSTGRES_DB=' + DB,
+    '-e', 'POSTGRES_USER=' + USER,
+    '-e', 'POSTGRES_PASSWORD=' + PASSWORD,
+    '-e', 'APP_DB_USER=' + APP_USER,
+    '-e', 'APP_DB_PASSWORD=' + APP_PASSWORD,
+    CONTAINER, 'sh', '/tmp/db/migrate.sh',
+  ]);
 
   console.log('Done.');
   printNext();
 }
 
 function printNext() {
+  const vars = {
+    TEST_DB_HOST: 'localhost',
+    TEST_DB_PORT: PORT,
+    TEST_DB_NAME: DB,
+    TEST_DB_USER: APP_USER,
+    TEST_DB_PASSWORD: APP_PASSWORD,
+    TEST_DB_ADMIN_USER: USER,
+    TEST_DB_ADMIN_PASSWORD: PASSWORD,
+    SESSION_SECRET: 'test',
+  };
+  const entries = Object.entries(vars);
+  const cmd = entries.map(([k, v]) => `set ${k}=${v}&`).join(' ');
+  const ps = entries.map(([k, v]) => `$env:${k}="${v}";`).join(' ');
+  const sh = entries.map(([k, v]) => `${k}=${v}`).join(' ');
   console.log(`
     Run integration tests from api/ with:
 
     Windows (cmd):
-      set TEST_DB_HOST=localhost& set TEST_DB_PORT=%d& set TEST_DB_PASSWORD=%s& set SESSION_SECRET=test& yarn test:integration', PORT, PASSWORD
+      ${cmd} yarn test:integration
 
     Windows (PowerShell):
-      $env:TEST_DB_HOST="localhost"; $env:TEST_DB_PORT="%d"; $env:TEST_DB_PASSWORD="%s"; $env:SESSION_SECRET="test"; yarn test:integration', PORT, PASSWORD
+      ${ps} yarn test:integration
 
     Linux / macOS / Git Bash:
-      TEST_DB_HOST=localhost TEST_DB_PORT=%d TEST_DB_PASSWORD=%s SESSION_SECRET=test yarn test:integration', PORT, PASSWORD`
+      ${sh} yarn test:integration
+
+    Or put the same values in api/.env.test and run: yarn test:integration:local`
   );
 }
 

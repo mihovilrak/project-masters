@@ -8,33 +8,45 @@ User "deletion" is done by setting `status_id = 3` (soft delete). Tables that re
 
 Status values used across the app:
 
-- **user_statuses**: 1 = active, 2 = inactive, 3 = deleted (soft).
+- **user_statuses**: 1 = active, 2 = inactive, 3 = deleted (soft). Only active users can log in.
 - **project_statuses** / **task_statuses**: 1 = active, 2 = …, 3 = deleted/archived (e.g. `delete_project` sets `status_id = 3`; views filter with `status_id != 3`).
+
+## Migrations
+
+[migrate.sh](migrate.sh) runs as the one-shot `migrate` compose service before `api` and `notifications` start:
+
+1. Applies `init/*.sql` in filename order, each file in a single transaction with `ON_ERROR_STOP=1`.
+2. Records each file's sha256 in `schema_migrations`; unchanged files are skipped. The scripts are idempotent, so an edited file is simply re-applied. A file whose first line is `-- migrate:always` runs every time.
+3. Creates or updates the application role from `APP_DB_USER` / `APP_DB_PASSWORD` ([app-role.sql](app-role.sql)).
+4. Seeds the admin user ([seed-admin.sh](seed-admin.sh)) if `ADMIN_PASSWORD` is set. An existing admin is left alone unless `ADMIN_PASSWORD_FORCE_RESET=true`.
+
+Because edited files are re-applied against existing databases, a changed function signature needs a `drop function if exists` for the old one, and a changed table needs `alter table` statements (not only the `create table if not exists`).
+
+Credentials go through a temporary `.pgpass` ([pgpass.sh](pgpass.sh)), never `PGPASSWORD`.
+
+## Roles and privileges
+
+- `POSTGRES_USER` owns the schema. Only `migrate` and `backup` connect with it.
+- `APP_DB_USER` (default `pm_app`) is what `api` and `notification-service` use: `LOGIN`, no `SUPERUSER` / `CREATEDB` / `CREATEROLE` / `BYPASSRLS`. It gets `CONNECT`, `USAGE` on `public`, DML on all tables, `USAGE`/`SELECT` on sequences and `EXECUTE` on functions. It cannot read `schema_migrations` or run DDL / `TRUNCATE`.
+- Functions run as invoker (no `SECURITY DEFINER`), so they only do what the app role itself may do. If a function ever needs elevated rights, make it `SECURITY DEFINER` with `set search_path = public, pg_temp` and review it.
+- The grants are re-applied on every migration, so new tables and functions are covered automatically.
 
 ## Integration test database
 
-CI and local integration tests use a Postgres database with the same schema as production. **The test DB must be initialized (or re-initialized) with the current `db/init/*.sql` scripts.**
+CI and local integration tests use a Postgres database with the same schema as production, initialized by `migrate.sh`.
 
-- **CI**: The workflow runs all `db/init/*.sql` files against the service Postgres before running integration tests.
-- **Local**: After any DB schema change (e.g. renamed or new functions, new tables), re-run the init scripts against your test DB so the API sees the latest schema. For example, from the repo root:
-  ```bash
-  for f in db/init/*.sql; do
-    PGPASSWORD=pm_password psql -h localhost -p 5433 -U pm_user -d pm_test -f "$f"
-  done
-  ```
-  Use your test DB host/port/user/password (e.g. from `api/.env.test`). If you use `yarn setup-test-db` from `api/`, ensure it runs these init scripts.
+- **CI**: runs `db/migrate.sh` against the service Postgres, then the tests connect as `pm_app` (fixtures seed and truncate as `pm_user` via `TEST_DB_ADMIN_*`).
+- **Local**: run `yarn setup-test-db` from `api/`. It starts `pm_test_db` on port 5433 and runs `migrate.sh` inside it; re-run it after schema changes.
 
-## Backup and cron
+## Backups
 
-- **Script**: [backup.sh](backup.sh) uses `.pgpass` (no `PGPASSWORD` in the environment) and writes gzipped dumps to the backup directory.
-- **Install**: Copy [backup.sh](backup.sh) to the path used by cron (e.g. `/usr/local/bin/backup.sh`) on the host or in the container that runs backups.
-- **Cron**: [pg_dump_cron](pg_dump_cron) invokes `/usr/local/bin/backup.sh`. Ensure the cron environment has `POSTGRES_HOST`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` set (e.g. via cron env or a wrapper that sources env and runs the script). The cron entry path must match the installed script path.
-- **Admin seed**: Set `ADMIN_PASSWORD` in the app environment to create/update the default admin user after DB init (see [seed-admin.sh](seed-admin.sh)).
+The `backup` compose service ([backup-scheduler.sh](backup-scheduler.sh)) runs [backup.sh](backup.sh) daily at `BACKUP_TIME` (`HH:MM`, in `TZ`, default `00:00`).
 
-## Function privileges
+- Dumps go to `./db/backup/db_dump_<timestamp>.sql.gz` on the host. A dump is written to a `.partial` file and only renamed after `gzip -t` passes; dumps older than 30 days are deleted.
+- The service runs as the `postgres` user (uid 70). On Linux, the host directory must be writable by it: `mkdir -p db/backup && sudo chown 70:70 db/backup`.
+- Run a backup now: `docker compose exec backup sh /scripts/backup.sh`.
+- Restore: `gunzip -c db/backup/<file>.sql.gz | docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"`.
 
-Functions are created with default privileges (run as invoker). Use `SECURITY DEFINER` only when a function must run with elevated rights (e.g. bypass RLS); document and review any such function.
+## Row Level Security (RLS)
 
-## Future: Row Level Security (RLS)
-
-RLS is not enabled. Enabling it would require the API to set per-request session context (e.g. `set_config('app.user_id', req.session.user.id, true)`) on each connection used for that request, and policies on each table referencing that context. Without that, enabling RLS would hide all rows. RLS is left for a later phase.
+RLS is not enabled. The app role does not bypass RLS, so policies would apply to it. Enabling RLS would also require the API to set per-request session context (e.g. `set_config('app.user_id', ..., true)` inside the request's transaction) and a policy on each table referencing that context; without both, enabling RLS would hide all rows.
