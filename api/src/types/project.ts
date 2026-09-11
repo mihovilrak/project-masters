@@ -27,14 +27,15 @@ export interface ProjectMember {
   name?: string;
   surname?: string;
   role?: string;
-  created_on: Date;
+  created_on?: Date;
   user?: User;
 }
 
-export interface ProjectDetails extends Project {
-  members: ProjectMember[];
-  tasks_count: number;
-  completed_tasks_count: number;
+export interface ProjectDetails extends Omit<Project, 'updated_on'> {
+  updated_on?: Date | null;
+  members?: ProjectMember[];
+  tasks_count?: number;
+  completed_tasks_count?: number;
 }
 
 export interface ProjectStatus {

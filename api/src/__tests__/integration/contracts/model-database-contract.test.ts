@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import * as adminModel from '../../../models/adminModel';
 import * as notificationModel from '../../../models/notificationModel';
 import * as permissionModel from '../../../models/permissionModel';
@@ -12,6 +14,19 @@ import {
   seedTestUser,
   testPool,
 } from '../setup/integration.setup';
+import { CommentWithUser } from '../../../types/comment';
+import { Profile } from '../../../types/profile';
+import { ProjectDetails, ProjectMember } from '../../../types/project';
+import { TaskDetails } from '../../../types/task';
+import { TimeLog } from '../../../types/timeLog';
+import { User } from '../../../types/user';
+
+const fields = <T>(...keys: (keyof T & string)[]) => keys;
+
+const columnsOf = async (call: string, params: unknown[] = []) =>
+  (
+    await testPool.query(`select * from ${call} limit 0`, params)
+  ).fields.map((field) => field.name);
 
 let owner: any;
 let admin: any;
@@ -179,5 +194,189 @@ describe('model/database contracts for previously broken runtime paths', () => {
 
     expect(new Set(names).size).toBe(names.length);
     expect(names).toContain('Admin');
+  });
+});
+
+describe('function columns cover the fields their models return', () => {
+  it('get_tasks ↔ taskModel (TaskDetails)', async () => {
+    // updated_on is optional on Task and not returned.
+    const expected = fields<TaskDetails>(
+      'id',
+      'name',
+      'project_id',
+      'project_name',
+      'holder_id',
+      'holder_name',
+      'assignee_id',
+      'assignee_name',
+      'parent_id',
+      'parent_name',
+      'description',
+      'type_id',
+      'type_name',
+      'status_id',
+      'status_name',
+      'status_color',
+      'priority_id',
+      'priority_name',
+      'start_date',
+      'due_date',
+      'end_date',
+      'spent_time',
+      'progress',
+      'created_by',
+      'created_by_name',
+      'created_on',
+      'estimated_time',
+    );
+
+    expect(await columnsOf('get_tasks()')).toEqual(
+      expect.arrayContaining(expected),
+    );
+  });
+
+  it('get_comments ↔ commentModel (CommentWithUser)', async () => {
+    const expected = fields<CommentWithUser>(
+      'id',
+      'task_id',
+      'user_id',
+      'user_name',
+      'comment',
+      'active',
+      'created_on',
+      'updated_on',
+    );
+
+    expect(await columnsOf('get_comments()')).toEqual(
+      expect.arrayContaining(expected),
+    );
+  });
+
+  it('get_users ↔ userModel (User)', async () => {
+    const expected = fields<User>(
+      'id',
+      'login',
+      'name',
+      'surname',
+      'email',
+      'status_id',
+      'role_id',
+      'created_on',
+      'updated_on',
+    );
+
+    expect(await columnsOf('get_users()')).toEqual(
+      expect.arrayContaining(expected),
+    );
+  });
+
+  it('get_profile ↔ profileModel (Profile)', async () => {
+    // updated_on and active are optional on Profile and not returned.
+    const expected = fields<Profile>(
+      'id',
+      'name',
+      'surname',
+      'email',
+      'login',
+      'role_name',
+      'created_on',
+      'last_login',
+      'total_tasks',
+      'completed_tasks',
+      'active_projects',
+      'total_hours',
+    );
+
+    expect(await columnsOf('get_profile($1)', [owner.id])).toEqual(
+      expect.arrayContaining(expected),
+    );
+  });
+
+  it('get_time_logs ↔ timeLogModel (TimeLog)', async () => {
+    const expected = fields<TimeLog>(
+      'id',
+      'task_id',
+      'user_id',
+      'log_date',
+      'spent_time',
+      'description',
+      'activity_type_id',
+      'created_on',
+      'updated_on',
+    );
+
+    expect(await columnsOf('get_time_logs()')).toEqual(
+      expect.arrayContaining(expected),
+    );
+  });
+
+  it('project_details ↔ projectModel (ProjectDetails)', async () => {
+    // updated_on, members, tasks_count and completed_tasks_count are
+    // optional on ProjectDetails and not returned here.
+    const expected = fields<ProjectDetails>(
+      'id',
+      'name',
+      'description',
+      'start_date',
+      'end_date',
+      'due_date',
+      'parent_id',
+      'parent_name',
+      'status_id',
+      'status_name',
+      'created_by',
+      'created_by_name',
+      'created_on',
+      'estimated_time',
+      'spent_time',
+      'progress',
+    );
+
+    expect(await columnsOf('project_details($1)', [project.id])).toEqual(
+      expect.arrayContaining(expected),
+    );
+  });
+
+  it('get_project_members ↔ projectModel (ProjectMember)', async () => {
+    // created_on is optional on ProjectMember and not returned here.
+    const expected = fields<ProjectMember>(
+      'project_id',
+      'user_id',
+      'name',
+      'surname',
+      'role',
+    );
+
+    expect(await columnsOf('get_project_members($1)', [project.id])).toEqual(
+      expect.arrayContaining(expected),
+    );
+  });
+});
+
+describe('db/init functions', () => {
+  it('each exist with exactly one overload', async () => {
+    const initDir = path.join(__dirname, '../../../../../db/init');
+    const names = new Set<string>();
+    for (const file of fs.readdirSync(initDir).filter((f) => f.endsWith('.sql'))) {
+      const sql = fs.readFileSync(path.join(initDir, file), 'utf8');
+      for (const match of sql.matchAll(
+        /create\s+or\s+replace\s+function\s+(?:public\.)?"?(\w+)"?/gi,
+      )) {
+        names.add(match[1].toLowerCase());
+      }
+    }
+
+    const { rows } = await testPool.query(
+      `select name, count(p.oid)::int as overloads
+       from unnest($1::text[]) as name
+       left join pg_proc p on p.proname = name
+         and p.pronamespace = 'public'::regnamespace
+       group by name
+       having count(p.oid) <> 1`,
+      [[...names]],
+    );
+
+    expect(names.size).toBeGreaterThan(0);
+    expect(rows).toEqual([]);
   });
 });

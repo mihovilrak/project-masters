@@ -1,42 +1,51 @@
 create or replace function task_status_id(p_name text)
 returns smallint
-language sql
+language plpgsql
 immutable
 strict
 as $$
-    select case lower(p_name)
-        when 'new' then 1
-        when 'in_progress' then 2
-        when 'on_hold' then 3
-        when 'review' then 4
-        when 'done' then 5
-        when 'cancelled' then 6
-        when 'deleted' then 7
-    end::smallint;
+begin
+    case lower(p_name)
+        when 'new' then return 1;
+        when 'in_progress' then return 2;
+        when 'on_hold' then return 3;
+        when 'review' then return 4;
+        when 'done' then return 5;
+        when 'cancelled' then return 6;
+        when 'deleted' then return 7;
+        else raise exception 'Unknown task status: %', p_name;
+    end case;
+end;
 $$;
 
 create or replace function project_status_id(p_name text)
 returns smallint
-language sql
+language plpgsql
 immutable
 strict
 as $$
-    select case lower(p_name)
-        when 'active' then 1
-        when 'inactive' then 2
-        when 'deleted' then 3
-    end::smallint;
+begin
+    case lower(p_name)
+        when 'active' then return 1;
+        when 'inactive' then return 2;
+        when 'deleted' then return 3;
+        else raise exception 'Unknown project status: %', p_name;
+    end case;
+end;
 $$;
 
 create or replace function user_status_id(p_name text)
 returns smallint
-language sql
+language plpgsql
 immutable
 strict
 as $$
-    select case lower(p_name)
-        when 'active' then 1
-        when 'inactive' then 2
-        when 'deleted' then 3
-    end::smallint;
+begin
+    case lower(p_name)
+        when 'active' then return 1;
+        when 'inactive' then return 2;
+        when 'deleted' then return 3;
+        else raise exception 'Unknown user status: %', p_name;
+    end case;
+end;
 $$;

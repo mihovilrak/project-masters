@@ -189,6 +189,38 @@ jobs:
           APP_DB_USER: pm_app
           APP_DB_PASSWORD: pm_app_password
 
+      # Unchanged files are skipped (only the migrate:always file re-runs),
+      # and an edited file is re-applied with its new checksum recorded.
+      - name: Re-run migrations
+        run: |
+          out=$(sh ../db/migrate.sh)
+          echo "$out"
+          echo "$out" | grep -qx 'Migrations applied: 1'
+
+          file=411_DATA_tags.sql
+          tmp=$(mktemp -d)
+          cp -r ../db/init "$tmp/init"
+          echo '-- ci re-run check' >> "$tmp/init/$file"
+          out=$(INIT_DIR="$tmp/init" sh ../db/migrate.sh)
+          echo "$out"
+          echo "$out" | grep -qx 'Migrations applied: 2'
+          expected=$(sha256sum "$tmp/init/$file" | cut -d ' ' -f 1)
+          stored=$(PGPASSWORD="$POSTGRES_PASSWORD" psql -X -At \
+            -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+            -c "select checksum from schema_migrations where filename = '$file'")
+          test "$stored" = "$expected"
+
+          # Restore the original checksum, which migrations.test.ts checks.
+          sh ../db/migrate.sh | grep -x 'Migrations applied: 2'
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: pm_test
+          POSTGRES_USER: pm_user
+          POSTGRES_PASSWORD: pm_password
+          APP_DB_USER: pm_app
+          APP_DB_PASSWORD: pm_app_password
+
       # The app connects as the non-superuser role, as in production.
       - name: Run integration tests
         run: yarn test:integration

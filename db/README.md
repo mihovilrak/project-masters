@@ -38,6 +38,20 @@ CI and local integration tests use a Postgres database with the same schema as p
 - **CI**: runs `db/migrate.sh` against the service Postgres, then the tests connect as `pm_app` (fixtures seed and truncate as `pm_user` via `TEST_DB_ADMIN_*`).
 - **Local**: run `yarn setup-test-db` from `api/`. It starts `pm_test_db` on port 5433 and runs `migrate.sh` inside it; re-run it after schema changes.
 
+### Database tests
+
+[api/src/\_\_tests\_\_/integration/db/](../api/src/__tests__/integration/db) tests the schema directly and runs as part of `yarn test:integration`:
+
+- `migrations.test.ts`: every `init/*.sql` file has a `schema_migrations` row with its sha256. CI also re-runs `migrate.sh` to check it applies only `-- migrate:always` files and picks up a changed checksum.
+- `privileges.test.ts`: `pm_app` gets DML on every table and an explicit `EXECUTE` grant on every function, but no DDL and no access to `schema_migrations`.
+- `triggers.test.ts`: task notifications, `updated_on` and `user_settings` triggers.
+- `notifications.test.ts`: fan-out, watcher and member notifications, due-soon sweeps, `user_notifications` and `get_notifications_for_service`.
+- `queries.test.ts`: `get_tasks` filters, spent time, permissions, `delete_role`, the status-id helpers, and the comment, user and profile functions.
+
+[contracts/model-database-contract.test.ts](../api/src/__tests__/integration/contracts/model-database-contract.test.ts) checks that function columns cover the fields the models return, and that every `create or replace function` in `init/` has exactly one overload.
+
+The tests use the helpers in [setup/db.helpers.ts](../api/src/__tests__/integration/setup/db.helpers.ts). `inRollback(pool, fn)` checks out a client, runs `begin`, then `fn(client)`, then always `rollback`, so tests leave no rows behind and need no cleanup. Use `appPool` to run as `pm_app`, or the admin `testPool` for things the app role may not do. Run the fixture inserts (`insertUser`, `insertProject`, `insertTask`, `insertTimeLog`) on that `client`. A failed statement aborts the transaction, so use `expectPgErrorIn(client, sql, code)`, which wraps the statement in a savepoint, when the test continues after the error.
+
 ## Backups
 
 The `backup` compose service ([backup-scheduler.sh](backup-scheduler.sh)) runs [backup.sh](backup.sh) daily at `BACKUP_TIME` (`HH:MM`, in `TZ`, default `00:00`).

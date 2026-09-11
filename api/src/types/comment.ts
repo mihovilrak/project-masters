@@ -20,9 +20,6 @@ export interface CommentUpdateInput {
 
 export interface CommentWithUser extends Comment {
   user_name: string;
-  user_surname: string;
-  user_email: string;
-  user_login: string;
 }
 
 export interface TaskRequest extends Request {

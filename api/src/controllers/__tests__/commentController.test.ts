@@ -58,9 +58,6 @@ describe('Comment Controller', () => {
         updated_on: new Date(),
         active: true,
         user_name: 'John',
-        user_surname: 'Doe',
-        user_email: 'john@example.com',
-        user_login: 'johndoe',
       },
     ];
 
@@ -238,9 +235,6 @@ describe('Comment Controller', () => {
       updated_on: new Date(),
       active: true,
       user_name: 'Test User',
-      user_surname: 'Name',
-      user_email: 'test@example.com',
-      user_login: 'testuser',
     };
 
     it('should edit comment successfully', async () => {
