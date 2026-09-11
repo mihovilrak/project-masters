@@ -676,7 +676,13 @@ describe('SettingsController', () => {
       });
 
       it('reports the failure without leaking the error', async () => {
-        process.env.ENV_FILE_PATH = path.join(envDir, 'missing', '.env');
+        // writeEnvFile creates a missing parent directory itself (the
+        // container filesystem may be read-only outside mounted volumes), so
+        // that alone doesn't fail. Force a write failure the directory
+        // auto-create can't route around.
+        jest.spyOn(fs, 'writeFileSync').mockImplementationOnce(() => {
+          throw new Error('disk error');
+        });
 
         await update({ PORT: '6000' });
 
