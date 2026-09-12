@@ -52,7 +52,7 @@ RUN yarn run ncc build src/index.ts -o dist -q && \
     cp -r src/templates/* dist/templates/
 
 # Final image
-FROM nginx:1.29.4-alpine3.23
+FROM nginx:1.31.2-alpine3.23
 
 WORKDIR /app
 
