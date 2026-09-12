@@ -169,8 +169,11 @@ jobs:
           docker compose logs --no-color --tail=500 || true
 
       - name: Stop services
+        # Runs even if an earlier step (e.g. the vulnerability scan) failed
+        # before .env was created, so guard against compose erroring on the
+        # missing required variables.
         if: always()
-        run: docker compose down -v
+        run: '[ -f .env ] && docker compose down -v || true'
 
       - name: Log in to Container Registry
         if: github.event_name != 'pull_request'

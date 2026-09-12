@@ -61,7 +61,11 @@ WORKDIR /app
 # Node comes from the builder base so build and runtime share a version.
 COPY --from=backend-builder /usr/local/bin/node /usr/local/bin/node
 
-RUN apk add --no-cache \
+# apk upgrade pulls in patched packages released after the base image was
+# built (curl, libexpat, libssl3, libuuid CVEs), since the base image tag
+# itself doesn't get rebuilt for every alpine security patch.
+RUN apk upgrade --no-cache && \
+    apk add --no-cache \
     libstdc++ \
     postgresql18-client && \
     mkdir -p api service uploads && \
