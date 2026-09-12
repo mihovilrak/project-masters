@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  act,
   render,
   screen,
   fireEvent,
@@ -50,6 +51,12 @@ const mockSettings: AppSettings = {
   time_zone: 'Europe/Zagreb',
   theme: 'light',
   welcome_message: '<p>Welcome</p>',
+  app_base_url: 'http://localhost:3000',
+  log_level: 'info',
+  email_enabled: false,
+  email_host: 'smtp.example.com',
+  email_port: 587,
+  email_secure: false,
 };
 
 const mockTimezones: TimezoneOption[] = [
@@ -367,13 +374,15 @@ describe('SystemSettings', () => {
       const sendButton = screen.getByTestId('smtp-test-button');
       fireEvent.click(sendButton);
 
-      // Check button shows loading state
-      await waitFor(() => {
-        expect(screen.getByText(/Sending.../i)).toBeInTheDocument();
-      });
+      // fireEvent already flushed the loading state; waiting on a promise that
+      // never settles would hang instead.
+      expect(screen.getByText('Sending...')).toBeInTheDocument();
+      expect(emailInput).toBeDisabled();
+      expect(sendButton).toBeDisabled();
 
-      // Resolve the promise to cleanup
-      resolvePromise!({ success: true, message: 'Done' });
+      await act(async () => {
+        resolvePromise!({ success: true, message: 'Done' });
+      });
     });
 
     it('handles API exception gracefully', async () => {

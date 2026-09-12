@@ -65,6 +65,8 @@ export interface TypesAndRolesState {
   selectedItem: TaskType | ActivityType | Role | null;
 }
 
+export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
+
 export interface AppSettings {
   id: number;
   app_name: string;
@@ -73,6 +75,12 @@ export interface AppSettings {
   time_zone: string;
   theme: 'light' | 'dark' | 'system';
   welcome_message: string;
+  app_base_url: string;
+  log_level: LogLevel;
+  email_enabled: boolean;
+  email_host: string;
+  email_port: number;
+  email_secure: boolean;
   created_on?: string;
   updated_on?: string;
 }

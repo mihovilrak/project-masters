@@ -1,8 +1,5 @@
 import { Request, Response } from 'express';
 import { Pool } from 'pg';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
 import nodemailer from 'nodemailer';
 import * as settingsController from '../settingsController';
 import * as settingsModel from '../../models/settingsModel';
@@ -287,17 +284,23 @@ describe('SettingsController', () => {
   describe('testSmtpConnection', () => {
     const originalEnv = process.env;
 
+    const enabledSettings = {
+      email_enabled: true,
+      email_host: 'smtp.test.com',
+      email_port: 587,
+      email_secure: false,
+      sender_email: 'Test <test@test.com>',
+    };
+
     beforeEach(() => {
       process.env = {
         ...originalEnv,
-        EMAIL_ENABLED: 'true',
-        EMAIL_HOST: 'smtp.test.com',
-        EMAIL_PORT: '587',
-        EMAIL_SECURE: 'false',
         EMAIL_USER: 'test@test.com',
         EMAIL_PASSWORD: 'testpassword',
-        EMAIL_FROM: 'Test <test@test.com>',
       };
+      (settingsModel.getSystemSettings as jest.Mock).mockResolvedValue(
+        enabledSettings,
+      );
     });
 
     afterEach(() => {
@@ -333,7 +336,10 @@ describe('SettingsController', () => {
     });
 
     it('should return 400 when email is disabled', async () => {
-      process.env.EMAIL_ENABLED = 'false';
+      (settingsModel.getSystemSettings as jest.Mock).mockResolvedValue({
+        ...enabledSettings,
+        email_enabled: false,
+      });
       mockReq.body = { email: 'test@example.com' };
       await settingsController.testSmtpConnection(
         mockReq,
@@ -344,7 +350,7 @@ describe('SettingsController', () => {
       expect(mockRes.json).toHaveBeenCalledWith({
         success: false,
         message:
-          'Email sending is disabled. Set EMAIL_ENABLED=true in environment.',
+          'Email sending is disabled. Enable it in System Settings.',
       });
     });
 
@@ -470,6 +476,9 @@ describe('SettingsController', () => {
         );
         expect(mockRes.status).toHaveBeenCalledWith(200);
         jest.clearAllMocks();
+        (settingsModel.getSystemSettings as jest.Mock).mockResolvedValue(
+          enabledSettings,
+        );
         mockRes = { status: jest.fn().mockReturnThis(), json: jest.fn() };
       }
 
@@ -487,210 +496,117 @@ describe('SettingsController', () => {
     });
   });
 
-  describe('env settings', () => {
-    let envDir: string;
-    let envPath: string;
-    const originalEnvFilePath = process.env.ENV_FILE_PATH;
+  describe('runtime settings', () => {
+    const invalidInputs: [string, Record<string, unknown>][] = [
+      ['unknown log level', { log_level: 'trace' }],
+      ['out of range port', { email_port: 70000 }],
+      ['non-integer port', { email_port: 25.5 }],
+      ['non-boolean email_enabled', { email_enabled: 'yes' }],
+      ['non-boolean email_secure', { email_secure: 1 }],
+      ['blank app_base_url', { app_base_url: '  ' }],
+      ['blank email_host', { email_host: '' }],
+      ['unknown theme', { theme: 'neon' }],
+    ];
 
-    beforeEach(() => {
-      envDir = fs.mkdtempSync(path.join(os.tmpdir(), 'env-settings-'));
-      envPath = path.join(envDir, '.env');
-      fs.writeFileSync(
-        envPath,
-        ['# comment', 'PORT=5000', 'LOG_LEVEL=info', 'FE_URL=http://old']
-          .map((line) => line + '\n')
-          .join(''),
-        'utf-8',
+    it.each(invalidInputs)('rejects %s', async (_label, body) => {
+      mockReq.body = body;
+      await settingsController.updateSystemSettings(
+        mockReq,
+        mockRes as Response,
+        mockPool as Pool,
       );
-      process.env.ENV_FILE_PATH = envPath;
+      expect(mockRes.status).toHaveBeenCalledWith(400);
+      expect(settingsModel.updateSystemSettings).not.toHaveBeenCalled();
     });
 
-    afterEach(() => {
-      if (originalEnvFilePath === undefined) {
-        delete process.env.ENV_FILE_PATH;
-      } else {
-        process.env.ENV_FILE_PATH = originalEnvFilePath;
-      }
-      fs.rmSync(envDir, { recursive: true, force: true });
-    });
-
-    const readEnv = () => fs.readFileSync(envPath, 'utf-8');
-
-    describe('getEnvSettings', () => {
-      it('returns the allowed keys with their file values', async () => {
-        await settingsController.getEnvSettings(
-          mockReq,
-          mockRes as Response,
-          mockPool as Pool,
-        );
-
-        expect(mockRes.status).toHaveBeenCalledWith(200);
-        const entries = (mockRes.json as jest.Mock).mock.calls[0][0];
-        expect(entries).toEqual(
-          expect.arrayContaining([
-            { key: 'PORT', value: '5000', masked: false },
-            { key: 'FE_URL', value: 'http://old', masked: false },
-          ]),
-        );
-      });
-
-      it('masks keys with no value', async () => {
-        await settingsController.getEnvSettings(
-          mockReq,
-          mockRes as Response,
-          mockPool as Pool,
-        );
-
-        const entries = (mockRes.json as jest.Mock).mock.calls[0][0];
-        const emailFrom = entries.find(
-          (entry: { key: string }) => entry.key === 'EMAIL_FROM',
-        );
-        expect(emailFrom).toEqual({
-          key: 'EMAIL_FROM',
-          value: '****',
-          masked: true,
-        });
-      });
-
-      it('reports the failure without leaking the error', async () => {
-        jest.spyOn(fs, 'existsSync').mockImplementationOnce(() => {
-          throw new Error('disk error');
-        });
-
-        await settingsController.getEnvSettings(
-          mockReq,
-          mockRes as Response,
-          mockPool as Pool,
-        );
-
-        expect(mockRes.status).toHaveBeenCalledWith(500);
-        expect(mockRes.json).toHaveBeenCalledWith({
-          error: 'Internal server error',
-        });
-      });
-    });
-
-    describe('updateEnvSettings', () => {
-      const update = (updates: Record<string, string>) => {
-        mockReq.body = { updates };
-        return settingsController.updateEnvSettings(
-          mockReq,
-          mockRes as Response,
-          mockPool as Pool,
-        );
+    it('accepts valid runtime values', async () => {
+      mockReq.body = {
+        log_level: 'debug',
+        email_port: 465,
+        email_enabled: true,
+        email_secure: true,
+        app_base_url: 'https://pm.example.com',
+        email_host: 'smtp.example.com',
       };
+      (settingsModel.getSystemSettings as jest.Mock).mockResolvedValue({});
+      (settingsModel.updateSystemSettings as jest.Mock).mockResolvedValue(
+        mockReq.body,
+      );
+      await settingsController.updateSystemSettings(
+        mockReq,
+        mockRes as Response,
+        mockPool as Pool,
+      );
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+    });
 
-      it('rewrites existing keys in place and appends new ones', async () => {
-        await update({ PORT: '6000', EMAIL_HOST: 'smtp.example.com' });
-
-        expect(mockRes.status).toHaveBeenCalledWith(200);
-        expect(readEnv()).toContain('PORT=6000');
-        expect(readEnv()).toContain('EMAIL_HOST=smtp.example.com');
-        expect(readEnv()).toContain('LOG_LEVEL=info');
+    it('audit-logs each changed runtime key with its previous value', async () => {
+      mockReq.body = { email_host: 'smtp.new', app_name: 'Renamed' };
+      (settingsModel.getSystemSettings as jest.Mock).mockResolvedValue({
+        email_host: 'smtp.old',
       });
+      (settingsModel.updateSystemSettings as jest.Mock).mockResolvedValue({});
 
-      it('rejects a key that is not editable', async () => {
-        await update({ NODE_ENV: 'production' });
+      await settingsController.updateSystemSettings(
+        mockReq,
+        mockRes as Response,
+        mockPool as Pool,
+      );
 
-        expect(mockRes.status).toHaveBeenCalledWith(400);
-        expect(readEnv()).not.toContain('NODE_ENV');
-      });
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actor: { id: '1', login: 'test' },
+          changes: [{ key: 'email_host', from: 'smtp.old', to: 'smtp.new' }],
+        }),
+        'Runtime settings updated',
+      );
+    });
 
-      it('rejects an invalid value without touching the file', async () => {
-        const before = readEnv();
-        await update({ PORT: '99999' });
+    it('does not audit-log when only cosmetic fields change', async () => {
+      mockReq.body = { app_name: 'Renamed', theme: 'dark' };
+      (settingsModel.updateSystemSettings as jest.Mock).mockResolvedValue({});
 
-        expect(mockRes.status).toHaveBeenCalledWith(400);
-        expect(readEnv()).toBe(before);
-      });
+      await settingsController.updateSystemSettings(
+        mockReq,
+        mockRes as Response,
+        mockPool as Pool,
+      );
 
-      it('rejects an invalid LOG_LEVEL', async () => {
-        await update({ LOG_LEVEL: 'verbose' });
+      expect(logger.warn).not.toHaveBeenCalled();
+      expect(settingsModel.getSystemSettings).not.toHaveBeenCalled();
+    });
 
-        expect(mockRes.status).toHaveBeenCalledWith(400);
-        expect(mockRes.json).toHaveBeenCalledWith({
-          error: expect.stringContaining('LOG_LEVEL must be one of'),
-        });
-      });
+    it('logs a null previous value when settings do not exist yet', async () => {
+      mockReq.body = { log_level: 'warn' };
+      (settingsModel.getSystemSettings as jest.Mock).mockResolvedValue(null);
+      (settingsModel.updateSystemSettings as jest.Mock).mockResolvedValue({});
 
-      it('rejects an out-of-range EMAIL_PORT', async () => {
-        await update({ EMAIL_PORT: '0' });
+      await settingsController.updateSystemSettings(
+        mockReq,
+        mockRes as Response,
+        mockPool as Pool,
+      );
 
-        expect(mockRes.status).toHaveBeenCalledWith(400);
-        expect(mockRes.json).toHaveBeenCalledWith({
-          error: 'EMAIL_PORT must be a number between 1 and 65535',
-        });
-      });
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          changes: [{ key: 'log_level', from: null, to: 'warn' }],
+        }),
+        'Runtime settings updated',
+      );
+    });
 
-      it('rejects a non-boolean EMAIL_ENABLED', async () => {
-        await update({ EMAIL_ENABLED: 'yes' });
+    it('treats a missing body as an empty update', async () => {
+      mockReq.body = undefined;
+      (settingsModel.updateSystemSettings as jest.Mock).mockResolvedValue({});
 
-        expect(mockRes.status).toHaveBeenCalledWith(400);
-        expect(mockRes.json).toHaveBeenCalledWith({
-          error: 'EMAIL_ENABLED must be true or false',
-        });
-      });
+      await settingsController.updateSystemSettings(
+        mockReq,
+        mockRes as Response,
+        mockPool as Pool,
+      );
 
-      it('rejects an empty FE_URL', async () => {
-        await update({ FE_URL: '   ' });
-
-        expect(mockRes.status).toHaveBeenCalledWith(400);
-        expect(mockRes.json).toHaveBeenCalledWith({
-          error: 'FE_URL cannot be empty',
-        });
-      });
-
-      it('accepts a valid EMAIL_ENABLED and LOG_LEVEL', async () => {
-        await update({ EMAIL_ENABLED: 'true', LOG_LEVEL: 'debug' });
-
-        expect(mockRes.status).toHaveBeenCalledWith(200);
-        expect(readEnv()).toContain('EMAIL_ENABLED=true');
-        expect(readEnv()).toContain('LOG_LEVEL=debug');
-      });
-
-      it('quotes values containing special characters', async () => {
-        await update({ EMAIL_FROM: 'Name, Inc <a@b.com>' });
-
-        expect(mockRes.status).toHaveBeenCalledWith(200);
-        expect(readEnv()).toContain(
-          'EMAIL_FROM="Name, Inc <a@b.com>"',
-        );
-      });
-
-      it('audit-logs the actor and the before/after of every write', async () => {
-        await update({ PORT: '6000' });
-
-        expect(logger.warn).toHaveBeenCalledWith(
-          expect.objectContaining({
-            actor: { id: '1', login: 'test' },
-            changes: [{ key: 'PORT', from: '5000', to: '6000' }],
-          }),
-          'Environment settings updated',
-        );
-      });
-
-      it('does not audit-log a rejected write', async () => {
-        await update({ PORT: 'not-a-port' });
-
-        expect(logger.warn).not.toHaveBeenCalled();
-      });
-
-      it('reports the failure without leaking the error', async () => {
-        // writeEnvFile creates a missing parent directory itself (the
-        // container filesystem may be read-only outside mounted volumes), so
-        // that alone doesn't fail. Force a write failure the directory
-        // auto-create can't route around.
-        jest.spyOn(fs, 'writeFileSync').mockImplementationOnce(() => {
-          throw new Error('disk error');
-        });
-
-        await update({ PORT: '6000' });
-
-        expect(mockRes.status).toHaveBeenCalledWith(500);
-        expect(mockRes.json).toHaveBeenCalledWith({
-          error: 'Internal server error',
-        });
-      });
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(logger.warn).not.toHaveBeenCalled();
     });
   });
 });

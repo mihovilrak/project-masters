@@ -23,7 +23,6 @@ export function readDatabaseConfig(
   env?: NodeJS.ProcessEnv,
   options?: DatabaseDefaults,
 ): DatabaseConfig;
-export function toDatabaseUrl(config: DatabaseConfig): string;
 export function createPool(
   database: PoolConfig,
   logger: Logger,

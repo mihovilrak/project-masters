@@ -5,13 +5,17 @@ import tseslint from 'typescript-eslint';
 
 export default defineConfig(
   eslint.configs.recommended,
+  {
+    files: ['**/*.js'],
+    languageOptions: { globals: { module: 'writable', require: 'readonly' } },
+  },
   ...tseslint.configs.recommended,
   {
     rules: {
-      // Relax strict rules so existing codebase passes; re-enable and fix over time
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': 'off',
-      '@typescript-eslint/no-empty-object-type': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
     },
     linterOptions: {
       reportUnusedDisableDirectives: 'error',

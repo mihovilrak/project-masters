@@ -13,8 +13,15 @@ select not exists (select 1 from pg_roles where rolname = :'app_user') as create
 create role :"app_user";
 \endif
 
+-- ALTER ROLE ... PASSWORD carries the password in the statement text, so it
+-- would land in the server log under log_statement = ddl/all. migrate.sh runs
+-- this in one transaction as the superuser, so SET LOCAL can suppress it.
+set local log_statement = 'none';
+
 alter role :"app_user" with login nosuperuser nocreatedb nocreaterole
     noreplication nobypassrls password :'app_password';
+
+reset log_statement;
 
 grant connect on database :"db_name" to :"app_user";
 grant usage on schema public to :"app_user";

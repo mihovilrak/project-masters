@@ -8,13 +8,9 @@ import { createPool } from '@pm/backend-common';
 // the browser as the previous or next day. Hand them over as 'YYYY-MM-DD'.
 types.setTypeParser(types.builtins.DATE, (value: string) => value);
 
-export const pool: Pool = createPool(
-  { connectionString: config.databaseUrl },
-  logger,
-  {
+export const pool: Pool = createPool(config.database, logger, {
   maxUses: 7500,
-  },
-);
+});
 
 export async function ensureConnection(): Promise<void> {
   try {

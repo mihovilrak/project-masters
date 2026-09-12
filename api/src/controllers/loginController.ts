@@ -97,7 +97,8 @@ export const logout = (req: Request, res: Response): void => {
   const cookieOptions: CookieOptions = {
     path: path || '/',
     sameSite,
-    secure: secure === 'auto' ? req.secure : secure,
+    // sessionMiddleware always sets a boolean; 'auto' only exists in the type.
+    secure: secure as boolean | undefined,
     httpOnly,
   };
 

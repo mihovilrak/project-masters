@@ -47,21 +47,43 @@ export const updateSystemSettings = async (
   pool: Pool,
   settings: SettingsUpdateInput,
 ): Promise<Settings | null> => {
-  const {
-    app_name,
-    company_name,
-    sender_email,
-    time_zone,
-    theme,
-    welcome_message,
-  } = settings;
+  // Every column is NOT NULL and callers may send a subset (the general form and
+  // the runtime panel post separately), so an omitted field keeps its value.
   const result = await pool.query(
     `UPDATE app_settings
-     SET (app_name, company_name, sender_email, time_zone, theme, welcome_message, updated_on)
-        = ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+     SET (app_name, company_name, sender_email, time_zone, theme, welcome_message,
+          app_base_url, log_level, email_enabled, email_host, email_port, email_secure, updated_on)
+        = (
+          COALESCE($1, app_name),
+          COALESCE($2, company_name),
+          COALESCE($3, sender_email),
+          COALESCE($4, time_zone),
+          COALESCE($5, theme),
+          COALESCE($6, welcome_message),
+          COALESCE($7, app_base_url),
+          COALESCE($8, log_level),
+          COALESCE($9, email_enabled),
+          COALESCE($10, email_host),
+          COALESCE($11, email_port),
+          COALESCE($12, email_secure),
+          CURRENT_TIMESTAMP
+        )
      WHERE id = 1
      RETURNING *`,
-    [app_name, company_name, sender_email, time_zone, theme, welcome_message],
+    [
+      settings.app_name ?? null,
+      settings.company_name ?? null,
+      settings.sender_email ?? null,
+      settings.time_zone ?? null,
+      settings.theme ?? null,
+      settings.welcome_message ?? null,
+      settings.app_base_url ?? null,
+      settings.log_level ?? null,
+      settings.email_enabled ?? null,
+      settings.email_host ?? null,
+      settings.email_port ?? null,
+      settings.email_secure ?? null,
+    ],
   );
   return result.rows[0] || null;
 };

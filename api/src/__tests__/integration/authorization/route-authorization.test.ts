@@ -115,7 +115,6 @@ describe('route authorization', () => {
     ['put', '/api/tags/1', { name: 'Blocked' }],
     ['delete', '/api/tags/1', {}],
     ['put', '/api/settings/app_settings', { app_name: 'Blocked' }],
-    ['patch', '/api/settings/env', { NODE_ENV: 'blocked' }],
     ['post', '/api/settings/test-smtp', { email: 'blocked@example.com' }],
     ['post', '/api/admin/task-types', { name: 'Blocked' }],
     ['put', '/api/admin/task-types/1', { name: 'Blocked' }],

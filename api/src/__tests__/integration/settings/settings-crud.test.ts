@@ -1,8 +1,5 @@
 import request from 'supertest';
 import { Express } from 'express';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import {
   cleanupTables,
   cookieHeader,
@@ -15,7 +12,6 @@ let admin: any;
 let adminCookies = '';
 let regularUser: any;
 let regularCookies = '';
-let envFilePath: string;
 
 beforeAll(async () => {
   const appModule = await import('../../../app');
@@ -55,26 +51,6 @@ beforeAll(async () => {
     password: 'password123',
   });
   regularCookies = cookieHeader(regularLogin.headers['set-cookie']);
-});
-
-beforeEach(async () => {
-  envFilePath = path.join(
-    os.tmpdir(),
-    `pm-settings-test-${process.pid}-${Date.now()}.env`,
-  );
-  process.env.ENV_FILE_PATH = envFilePath;
-  fs.writeFileSync(
-    envFilePath,
-    ['NODE_ENV=test', 'PORT=3000', 'LOG_LEVEL=info', 'EMAIL_ENABLED=false'].join('\n') + '\n',
-    'utf-8',
-  );
-});
-
-afterEach(() => {
-  delete process.env.ENV_FILE_PATH;
-  if (envFilePath && fs.existsSync(envFilePath)) {
-    fs.unlinkSync(envFilePath);
-  }
 });
 
 describe('GET/PUT /api/settings/app_settings', () => {
@@ -179,64 +155,59 @@ describe('GET/PUT /api/settings/user_settings', () => {
   });
 });
 
-describe('GET/PATCH /api/settings/env', () => {
-  it('returns 401 when not authenticated', async () => {
-    const response = await request(app).get('/api/settings/env');
-    expect(response.status).toBe(401);
+describe('PUT /api/settings/app_settings runtime fields', () => {
+  it('persists runtime fields for an admin', async () => {
+    const response = await request(app)
+      .put('/api/settings/app_settings')
+      .set('Cookie', adminCookies)
+      .send({
+        app_base_url: 'https://pm.example.com',
+        log_level: 'debug',
+        email_enabled: false,
+        email_host: 'smtp.example.com',
+        email_port: 2525,
+        email_secure: false,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      app_base_url: 'https://pm.example.com',
+      log_level: 'debug',
+      email_host: 'smtp.example.com',
+      email_port: 2525,
+    });
+  });
+
+  it('rejects an invalid email_port', async () => {
+    const response = await request(app)
+      .put('/api/settings/app_settings')
+      .set('Cookie', adminCookies)
+      .send({ email_port: 99999 });
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects an invalid log_level', async () => {
+    const response = await request(app)
+      .put('/api/settings/app_settings')
+      .set('Cookie', adminCookies)
+      .send({ log_level: 'verbose' });
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects a non-boolean email_enabled', async () => {
+    const response = await request(app)
+      .put('/api/settings/app_settings')
+      .set('Cookie', adminCookies)
+      .send({ email_enabled: 'yes' });
+    expect(response.status).toBe(400);
   });
 
   it('returns 403 for a non-admin user', async () => {
     const response = await request(app)
-      .get('/api/settings/env')
-      .set('Cookie', regularCookies);
+      .put('/api/settings/app_settings')
+      .set('Cookie', regularCookies)
+      .send({ log_level: 'debug' });
     expect(response.status).toBe(403);
-  });
-
-  it('reads entries with masked secrets', async () => {
-    const response = await request(app)
-      .get('/api/settings/env')
-      .set('Cookie', adminCookies);
-    expect(response.status).toBe(200);
-    const port = response.body.find((entry: any) => entry.key === 'PORT');
-    expect(port).toMatchObject({ value: '3000', masked: false });
-  });
-
-  it('updates editable keys and persists them to the env file', async () => {
-    const response = await request(app)
-      .patch('/api/settings/env')
-      .set('Cookie', adminCookies)
-      .send({ updates: { PORT: '4000', LOG_LEVEL: 'debug' } });
-
-    expect(response.status).toBe(200);
-    expect(response.body.restartRequired).toBe(true);
-
-    const written = fs.readFileSync(envFilePath, 'utf-8');
-    expect(written).toContain('PORT=4000');
-    expect(written).toContain('LOG_LEVEL=debug');
-  });
-
-  it('rejects an invalid PORT value', async () => {
-    const response = await request(app)
-      .patch('/api/settings/env')
-      .set('Cookie', adminCookies)
-      .send({ updates: { PORT: '99999' } });
-    expect(response.status).toBe(400);
-  });
-
-  it('rejects an invalid LOG_LEVEL value', async () => {
-    const response = await request(app)
-      .patch('/api/settings/env')
-      .set('Cookie', adminCookies)
-      .send({ updates: { LOG_LEVEL: 'verbose' } });
-    expect(response.status).toBe(400);
-  });
-
-  it('rejects a non-editable key', async () => {
-    const response = await request(app)
-      .patch('/api/settings/env')
-      .set('Cookie', adminCookies)
-      .send({ updates: { NODE_ENV: 'production' } });
-    expect(response.status).toBe(400);
   });
 });
 

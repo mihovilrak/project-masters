@@ -31,3 +31,13 @@ export interface Config {
   appBaseUrl: string;
   app: AppConfig;
 }
+
+// The runtime-editable half of app_settings, shared with the API.
+export interface AppSettingsRow {
+  sender_email: string;
+  app_base_url: string;
+  email_enabled: boolean;
+  email_host: string;
+  email_port: number;
+  email_secure: boolean;
+}

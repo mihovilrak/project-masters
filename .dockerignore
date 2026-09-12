@@ -1,20 +1,22 @@
-.git
-.gitignore
+# Allowlist: nothing reaches the builder unless re-included below.
+*
 
-**/*.env*
+!fe/
+!api/
+!notification-service/
+!packages/
+!db/init/
+!db/*.sh
+!db/app-role.sql
 
-**/*.log
+# Re-exclude what the allowed trees still carry.
 **/node_modules
-
-**/tmp*
-
+**/dist
+**/coverage
 **/__tests__
 **/integration
-
-.vscode
-.cursorignore
-.cursorrules
-
+**/*.env*
+**/*.log
 **/*.md
-
-.obsolete
+fe/build
+api/uploads

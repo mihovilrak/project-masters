@@ -29,6 +29,12 @@ const DEFAULT_SETTINGS: SystemSettingsState = {
     time_zone: 'UTC',
     theme: 'light',
     welcome_message: '',
+    app_base_url: 'http://localhost:3000',
+    log_level: 'info',
+    email_enabled: false,
+    email_host: 'smtp.example.com',
+    email_port: 587,
+    email_secure: false,
     created_on: '2023-01-01',
     updated_on: '2023-01-01',
   },
@@ -70,6 +76,7 @@ describe('Home', () => {
       timezonesError: null,
       handleSubmit: jest.fn(),
       handleChange: jest.fn(),
+      setField: jest.fn(),
     });
 
     renderWithProviders(<Home />);
@@ -98,6 +105,7 @@ describe('Home', () => {
       timezonesError: null,
       handleSubmit: jest.fn(),
       handleChange: jest.fn(),
+      setField: jest.fn(),
     });
 
     renderWithProviders(<Home />);
@@ -127,6 +135,7 @@ describe('Home', () => {
       timezonesError: null,
       handleSubmit: jest.fn(),
       handleChange: jest.fn(),
+      setField: jest.fn(),
     });
 
     renderWithProviders(<Home />);
@@ -160,6 +169,7 @@ describe('Home', () => {
       timezonesError: null,
       handleSubmit: jest.fn(),
       handleChange: jest.fn(),
+      setField: jest.fn(),
     });
 
     renderWithProviders(<Home />);
@@ -186,6 +196,7 @@ describe('Home', () => {
       timezonesError: null,
       handleSubmit: jest.fn(),
       handleChange: jest.fn(),
+      setField: jest.fn(),
     });
 
     renderWithProviders(<Home />);

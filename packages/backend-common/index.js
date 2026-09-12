@@ -1,10 +1,8 @@
 const { Pool } = require('pg');
 const pino = require('pino');
 
-const createLogger = (env = process.env) => {
-  const isDev = env.NODE_ENV !== 'production';
-  const isTest = env.NODE_ENV === 'test';
-  return pino({
+const createLogger = (env = process.env) =>
+  pino({
     level: env.LOG_LEVEL || 'info',
     redact: {
       paths: [
@@ -23,15 +21,7 @@ const createLogger = (env = process.env) => {
       ],
       censor: '[redacted]',
     },
-    ...(isDev &&
-      !isTest && {
-        transport: {
-          target: 'pino/file',
-          options: { destination: 1 },
-        },
-      }),
   });
-};
 
 const readDatabaseConfig = (env = process.env, options = {}) => {
   const test = options.preferTest && env.TEST_DB_HOST;
@@ -48,9 +38,6 @@ const readDatabaseConfig = (env = process.env, options = {}) => {
     database: value('DB', 'NAME', options.database),
   };
 };
-
-const toDatabaseUrl = ({ user, password, host, port, database }) =>
-  `postgres://${user}:${password}@${host}:${port}/${database}`;
 
 const createPool = (database, logger, overrides = {}) => {
   const pool = new Pool({
@@ -70,5 +57,4 @@ module.exports = {
   createLogger,
   createPool,
   readDatabaseConfig,
-  toDatabaseUrl,
 };

@@ -1,7 +1,7 @@
 x-db: &db
   POSTGRES_DB: ${POSTGRES_DB}
   POSTGRES_USER: ${POSTGRES_USER}
-  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
 
 # The API and notification service connect as the non-superuser role that
 # the migrate service creates; the superuser is only used by db, migrate and backup.
@@ -11,20 +11,20 @@ x-app-db: &app-db
   POSTGRES_USER: ${APP_DB_USER:-pm_app}
   POSTGRES_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD must be set}
 
+# Only the SMTP credentials stay in the environment; host, port, sender and the
+# on/off switch are edited in the admin UI and stored in app_settings.
 x-email: &email
-  EMAIL_ENABLED: ${EMAIL_ENABLED}
-  EMAIL_HOST: ${EMAIL_HOST}
-  EMAIL_PORT: ${EMAIL_PORT}
-  EMAIL_SECURE: ${EMAIL_SECURE}
   EMAIL_USER: ${EMAIL_USER}
   EMAIL_PASSWORD: ${EMAIL_PASSWORD}
-  EMAIL_FROM: ${EMAIL_FROM}
 
 x-defaults: &defaults
-  networks:
-    - pm_network
-  restart: always
+  restart: unless-stopped
   read_only: true
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
   security_opt:
     - no-new-privileges:true
   cap_drop:
@@ -32,17 +32,23 @@ x-defaults: &defaults
   tmpfs:
     - /tmp:mode=1777
 
+# APP_IMAGE defaults to the published image; the tag only exists once a matching
+# v* git tag is pushed. Build locally with `docker compose build` (or
+# `docker build -t project-node:dev .`) and set APP_IMAGE to use your own build.
 x-app: &app
   <<: *defaults
   image: ${APP_IMAGE:-ghcr.io/mihovilrak/project-node:1.0.0}
+  build: .
   user: nginx
+  init: true
 
 services:
   db:
     <<: *defaults
     image: postgres:18.1-alpine3.23
-    container_name: pm_db
     user: postgres
+    networks:
+      - backend
     mem_limit: 512m
     cpus: 1.0
     environment:
@@ -63,13 +69,15 @@ services:
   # One-shot: applies db/init, (re)creates the app role and seeds the admin.
   migrate:
     <<: *app
-    container_name: pm_migrate
     restart: "no"
+    networks:
+      - backend
     mem_limit: 256m
     command: ["/app/db/migrate.sh"]
     environment:
       <<: *db
       POSTGRES_HOST: db
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ADMIN_PASSWORD_FORCE_RESET: ${ADMIN_PASSWORD_FORCE_RESET:-false}
       APP_DB_USER: ${APP_DB_USER:-pm_app}
@@ -80,22 +88,21 @@ services:
 
   api:
     <<: *app
-    container_name: pm_api
+    networks:
+      - backend
+      - frontend
     mem_limit: 512m
     cpus: 1.0
     command: ["node", "/app/api/index.js"]
     environment:
       <<: [*app-db, *email]
-      NODE_ENV: ${NODE_ENV}
-      SESSION_SECRET: ${SESSION_SECRET}
+      NODE_ENV: ${NODE_ENV:-production}
+      TZ: ${TZ}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET must be set}
       FE_URL: ${FE_URL}
-      APP_BASE_URL: ${APP_BASE_URL:-}
       LOG_LEVEL: ${LOG_LEVEL}
-      UPLOADS_DIR: /app/uploads
-      ENV_FILE_PATH: /app/config/.env
     volumes:
       - app_uploads:/app/uploads
-      - app_config:/app/config
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5000/api/health"]
       interval: 30s
@@ -108,21 +115,21 @@ services:
 
   notifications:
     <<: *app
-    container_name: pm_notifications
+    networks:
+      - backend
     mem_limit: 256m
     cpus: 0.5
     command: ["node", "/app/service/index.js"]
     environment:
       <<: [*app-db, *email]
-      NODE_ENV: ${NODE_ENV}
+      NODE_ENV: ${NODE_ENV:-production}
+      TZ: ${TZ}
       FE_URL: ${FE_URL}
-      APP_BASE_URL: ${APP_BASE_URL:-}
       LOG_LEVEL: ${LOG_LEVEL}
-      ENV_FILE_PATH: /app/config/.env
-    volumes:
-      - app_config:/app/config
+      METRICS_ENABLED: ${METRICS_ENABLED:-false}
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5001/ready"]
+      # /ready gates on the database, /health on the cached SMTP probe.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:5001/ready && wget -q -O /dev/null http://127.0.0.1:5001/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -133,16 +140,18 @@ services:
 
   web:
     <<: *app
-    container_name: pm_web
+    networks:
+      - frontend
     mem_limit: 128m
     cpus: 0.5
     ports:
-      - "3000:8080"
+      - "127.0.0.1:3000:8080"
     tmpfs:
       - /tmp:mode=1777
       - /var/cache/nginx:uid=101,gid=101,mode=0750
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/health"]
+      # nginx only: /api/health would mark web unhealthy whenever api is down.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -153,32 +162,30 @@ services:
 
   # Daily pg_dump at BACKUP_TIME (HH:MM, TZ) into ./db/backup on the host.
   backup:
-    <<: *defaults
-    image: postgres:18.1-alpine3.23
-    container_name: pm_backup
-    user: postgres
+    <<: *app
+    networks:
+      - backend
     mem_limit: 128m
     cpus: 0.5
-    entrypoint: ["sh", "/scripts/backup-scheduler.sh"]
+    entrypoint: ["sh", "/app/db/backup-scheduler.sh"]
     environment:
       <<: *db
       POSTGRES_HOST: db
       BACKUP_TIME: ${BACKUP_TIME:-00:00}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
       TZ: ${TZ}
     volumes:
-      - ./db/backup.sh:/scripts/backup.sh:ro
-      - ./db/backup-scheduler.sh:/scripts/backup-scheduler.sh:ro
-      - ./db/pgpass.sh:/scripts/pgpass.sh:ro
       - ./db/backup:/backups
     depends_on:
       db:
         condition: service_healthy
 
 networks:
-  pm_network:
+  backend:
+    driver: bridge
+  frontend:
     driver: bridge
 
 volumes:
   app_uploads:
-  app_config:
   db_data:

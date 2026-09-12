@@ -20,6 +20,8 @@ import {
   Grid,
   Autocomplete,
   ListSubheader,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
   FormatBold,
@@ -35,13 +37,8 @@ import { sanitizeHtml } from '../../utils/sanitize';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
-import {
-  testSmtpConnection,
-  SmtpTestResult,
-  getEnvSettings,
-  updateEnvSettings,
-  EnvEntry,
-} from '../../api/settings';
+import { testSmtpConnection, SmtpTestResult } from '../../api/settings';
+import { LogLevel } from '../../types/setting';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -149,101 +146,14 @@ const SystemSettings: React.FC = () => {
     timezonesError,
     handleSubmit,
     handleChange,
+    setField,
   } = useSystemSettings();
   const [tabValue, setTabValue] = React.useState(0);
   const [smtpTestEmail, setSmtpTestEmail] = React.useState('');
   const [smtpTestLoading, setSmtpTestLoading] = React.useState(false);
   const [smtpTestResult, setSmtpTestResult] =
     React.useState<SmtpTestResult | null>(null);
-  const [envEntries, setEnvEntries] = React.useState<EnvEntry[]>([]);
-  const [envLoading, setEnvLoading] = React.useState(false);
-  const [envError, setEnvError] = React.useState<string | null>(null);
-  const [envSaving, setEnvSaving] = React.useState(false);
-  const [envSuccess, setEnvSuccess] = React.useState<string | null>(null);
-  const [envEdits, setEnvEdits] = React.useState<Record<string, string>>({});
-  const [envValidation, setEnvValidation] = React.useState<
-    Record<string, string>
-  >({});
-
-  const EDITABLE_KEYS = [
-    'PORT',
-    'FE_URL',
-    'LOG_LEVEL',
-    'EMAIL_ENABLED',
-    'EMAIL_HOST',
-    'EMAIL_PORT',
-    'EMAIL_FROM',
-  ];
-  const LOG_LEVEL_OPTIONS = ['error', 'warn', 'info', 'debug'];
-
-  const validateEnvValue = (key: string, value: string): string | null => {
-    const v = String(value).trim();
-    switch (key) {
-      case 'PORT':
-      case 'EMAIL_PORT': {
-        const num = parseInt(v, 10);
-        if (v !== '' && (Number.isNaN(num) || num < 1 || num > 65535)) {
-          return 'Must be a number between 1 and 65535';
-        }
-        return null;
-      }
-      case 'LOG_LEVEL':
-        if (v !== '' && !LOG_LEVEL_OPTIONS.includes(v.toLowerCase())) {
-          return `Must be one of: ${LOG_LEVEL_OPTIONS.join(', ')}`;
-        }
-        return null;
-      case 'EMAIL_ENABLED':
-        if (v !== '' && v !== 'true' && v !== 'false')
-          return 'Must be true or false';
-        return null;
-      case 'FE_URL':
-      case 'EMAIL_HOST':
-      case 'EMAIL_FROM':
-        if (v.length === 0 && EDITABLE_KEYS.includes(key))
-          return 'Cannot be empty';
-        return null;
-      default:
-        return null;
-    }
-  };
-
-  const handleEnvEdit = (key: string, value: string) => {
-    setEnvEdits((prev) => ({ ...prev, [key]: value }));
-    const err = validateEnvValue(key, value);
-    setEnvValidation((prev) =>
-      err ? { ...prev, [key]: err } : { ...prev, [key]: '' },
-    );
-  };
-
-  const handleSaveEnv = async () => {
-    const updates: Record<string, string> = {};
-    let hasError = false;
-    for (const key of Object.keys(envEdits)) {
-      const value = envEdits[key];
-      const err = validateEnvValue(key, value);
-      if (err) {
-        setEnvValidation((prev) => ({ ...prev, [key]: err }));
-        hasError = true;
-      } else {
-        updates[key] = String(value).trim();
-      }
-    }
-    if (hasError || Object.keys(updates).length === 0) return;
-    setEnvSaving(true);
-    setEnvError(null);
-    setEnvSuccess(null);
-    try {
-      const result = await updateEnvSettings(updates);
-      setEnvEdits({});
-      setEnvValidation({});
-      setEnvSuccess(result.message);
-      await loadEnvSettings();
-    } catch {
-      setEnvError('Failed to update environment variables.');
-    } finally {
-      setEnvSaving(false);
-    }
-  };
+  const LOG_LEVEL_OPTIONS: LogLevel[] = ['error', 'warn', 'info', 'debug'];
 
   const handleSmtpTest = async () => {
     if (!smtpTestEmail) {
@@ -308,24 +218,6 @@ const SystemSettings: React.FC = () => {
       },
     } as React.ChangeEvent<HTMLInputElement>);
   };
-
-  const loadEnvSettings = React.useCallback(async () => {
-    setEnvLoading(true);
-    setEnvError(null);
-    try {
-      const data = await getEnvSettings();
-      setEnvEntries(data || []);
-    } catch {
-      setEnvError('Failed to load environment variables.');
-      setEnvEntries([]);
-    } finally {
-      setEnvLoading(false);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    loadEnvSettings();
-  }, [loadEnvSettings]);
 
   if (state.loading) {
     return (
@@ -551,169 +443,81 @@ const SystemSettings: React.FC = () => {
         <Grid size={{ xs: 12, md: 5 }}>
           <Box sx={{ pl: { md: 2 } }}>
             <Typography variant="h6" gutterBottom>
-              Environment Variables
+              Runtime Configuration
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Editable configuration. Changes update the .env file and take
-              effect after the application is restarted. Passwords and secrets
-              are not displayed.
+              Saved with the Save Settings button and applied without
+              restarting. SMTP credentials stay in the server environment and
+              are never shown here.
             </Typography>
-            {envError && (
-              <Alert
-                severity="error"
-                sx={{ mb: 2 }}
-                onClose={() => setEnvError(null)}
-              >
-                {envError}
-              </Alert>
-            )}
-            {envSuccess && (
-              <Alert
-                severity="success"
-                sx={{ mb: 2 }}
-                onClose={() => setEnvSuccess(null)}
-              >
-                {envSuccess}
-              </Alert>
-            )}
-            {envLoading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-                <CircularProgress size={24} />
-              </Box>
-            ) : envEntries.length > 0 ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {envEntries.map((entry) => {
-                  const isEditable =
-                    EDITABLE_KEYS.includes(entry.key) && !entry.masked;
-                  const displayValue =
-                    envEdits[entry.key] !== undefined
-                      ? envEdits[entry.key]
-                      : entry.masked
-                        ? '****'
-                        : entry.value;
-                  const error = envValidation[entry.key];
-                  return (
-                    <Box key={entry.key}>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ display: 'block', mb: 0.5 }}
-                      >
-                        {entry.key}
-                      </Typography>
-                      {isEditable ? (
-                        entry.key === 'LOG_LEVEL' ? (
-                          <FormControl
-                            fullWidth
-                            size="small"
-                            error={Boolean(error)}
-                          >
-                            <Select
-                              value={displayValue || ''}
-                              onChange={(e) =>
-                                handleEnvEdit(entry.key, e.target.value)
-                              }
-                              displayEmpty
-                            >
-                              {LOG_LEVEL_OPTIONS.map((opt) => (
-                                <MenuItem key={opt} value={opt}>
-                                  {opt}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                            {error && (
-                              <Typography
-                                variant="caption"
-                                color="error"
-                                sx={{ mt: 0.5 }}
-                              >
-                                {error}
-                              </Typography>
-                            )}
-                          </FormControl>
-                        ) : entry.key === 'EMAIL_ENABLED' ? (
-                          <FormControl
-                            fullWidth
-                            size="small"
-                            error={Boolean(error)}
-                          >
-                            <Select
-                              value={
-                                displayValue === 'true' ||
-                                displayValue === 'false'
-                                  ? displayValue
-                                  : ''
-                              }
-                              onChange={(e) =>
-                                handleEnvEdit(entry.key, e.target.value)
-                              }
-                              displayEmpty
-                            >
-                              <MenuItem value="true">true</MenuItem>
-                              <MenuItem value="false">false</MenuItem>
-                            </Select>
-                            {error && (
-                              <Typography
-                                variant="caption"
-                                color="error"
-                                sx={{ mt: 0.5 }}
-                              >
-                                {error}
-                              </Typography>
-                            )}
-                          </FormControl>
-                        ) : (
-                          <TextField
-                            fullWidth
-                            size="small"
-                            value={displayValue}
-                            onChange={(e) =>
-                              handleEnvEdit(entry.key, e.target.value)
-                            }
-                            onBlur={() =>
-                              validateEnvValue(
-                                entry.key,
-                                envEdits[entry.key] ?? entry.value,
-                              )
-                            }
-                            error={Boolean(error)}
-                            helperText={error}
-                            type={
-                              entry.key === 'PORT' || entry.key === 'EMAIL_PORT'
-                                ? 'number'
-                                : 'text'
-                            }
-                          />
-                        )
-                      ) : (
-                        <TextField
-                          fullWidth
-                          size="small"
-                          value={displayValue}
-                          disabled
-                        />
-                      )}
-                    </Box>
-                  );
-                })}
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  onClick={handleSaveEnv}
-                  disabled={envSaving || Object.keys(envEdits).length === 0}
-                  sx={{ mt: 2 }}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <TextField
+                label="App Base URL"
+                name="app_base_url"
+                value={state.settings.app_base_url || ''}
+                onChange={handleChange}
+                helperText="Used to build links in notification emails"
+                fullWidth
+                size="small"
+              />
+              <FormControl fullWidth size="small">
+                <InputLabel id="log-level-label">Log Level</InputLabel>
+                <Select
+                  labelId="log-level-label"
+                  label="Log Level"
+                  value={state.settings.log_level || 'info'}
+                  onChange={(e) =>
+                    setField('log_level', e.target.value as LogLevel)
+                  }
                 >
-                  {envSaving ? 'Saving...' : 'Save env changes'}
-                </Button>
-              </Box>
-            ) : (
-              !envError &&
-              !envLoading && (
-                <Typography color="text.secondary">
-                  No environment variables available.
-                </Typography>
-              )
-            )}
+                  {LOG_LEVEL_OPTIONS.map((opt) => (
+                    <MenuItem key={opt} value={opt}>
+                      {opt}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={Boolean(state.settings.email_enabled)}
+                    onChange={(e) =>
+                      setField('email_enabled', e.target.checked)
+                    }
+                    inputProps={{ 'aria-label': 'Email enabled' }}
+                  />
+                }
+                label="Email sending enabled"
+              />
+              <TextField
+                label="SMTP Host"
+                name="email_host"
+                value={state.settings.email_host || ''}
+                onChange={handleChange}
+                fullWidth
+                size="small"
+              />
+              <TextField
+                label="SMTP Port"
+                type="number"
+                value={state.settings.email_port ?? ''}
+                onChange={(e) =>
+                  setField('email_port', Number(e.target.value))
+                }
+                fullWidth
+                size="small"
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={Boolean(state.settings.email_secure)}
+                    onChange={(e) => setField('email_secure', e.target.checked)}
+                    inputProps={{ 'aria-label': 'SMTP implicit TLS' }}
+                  />
+                }
+                label="Implicit TLS (port 465)"
+              />
+            </Box>
           </Box>
         </Grid>
       </Grid>

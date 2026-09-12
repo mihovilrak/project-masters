@@ -2,6 +2,7 @@ import * as schedule from 'node-schedule';
 import type { Server } from 'http';
 import { config, validateConfig } from './config';
 import { pool } from './db';
+import { reloadSettings } from './settingsStore';
 import { startServer, stopSmtpProbe } from './server';
 import { scheduleCleanup } from './jobs/cleanup';
 import { scheduleDueSoon } from './jobs/dueSoon';
@@ -18,6 +19,11 @@ const initializeService = async (): Promise<void> => {
     }
     await pool.query('SELECT 1');
     logger.info('Database connection established');
+
+    // Load the admin-editable settings before the first send.
+    if (await reloadSettings()) {
+      emailService.refreshTransport();
+    }
 
     await emailService.initializeTemplates();
 

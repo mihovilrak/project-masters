@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
-import { SystemSettingsState, TimezoneOption } from '../../types/setting';
+import {
+  AppSettings,
+  SystemSettingsState,
+  TimezoneOption,
+} from '../../types/setting';
 import {
   getSystemSettings,
   updateSystemSettings,
@@ -16,6 +20,12 @@ export const useSystemSettings = () => {
       time_zone: '',
       theme: 'system',
       welcome_message: '',
+      app_base_url: '',
+      log_level: 'info',
+      email_enabled: false,
+      email_host: '',
+      email_port: 587,
+      email_secure: false,
     },
     loading: true,
     error: null,
@@ -99,6 +109,17 @@ export const useSystemSettings = () => {
     }));
   };
 
+  // Non-string fields (ports, switches) cannot go through handleChange.
+  const setField = <K extends keyof AppSettings>(
+    name: K,
+    value: AppSettings[K],
+  ): void => {
+    setState((prev) => ({
+      ...prev,
+      settings: { ...prev.settings, [name]: value },
+    }));
+  };
+
   return {
     state,
     timezones,
@@ -106,5 +127,6 @@ export const useSystemSettings = () => {
     timezonesError,
     handleSubmit,
     handleChange,
+    setField,
   };
 };

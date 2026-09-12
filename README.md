@@ -95,7 +95,8 @@ Key environment variables needed (see [.env.example](.env.example)):
 - `ADMIN_PASSWORD`: Password of the default `admin` user, created on first start
 - `BACKUP_TIME`: Daily backup time, `HH:MM` in `TZ` (default `00:00`)
 - `SESSION_SECRET`: Session encryption key
-- `EMAIL_*`: Email service configuration
+- `EMAIL_USER`, `EMAIL_PASSWORD`: SMTP credentials. Host, port, TLS, sender address and the enable switch live in Settings > System Settings and are stored in the database
+- `METRICS_ENABLED`: Set to `true` to make the notification service log counters (sent, errors, dead-lettered) every 30s (default off)
 - `NODE_ENV`: Environment (development/production)
 
 ## 🐳 Docker

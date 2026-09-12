@@ -1,13 +1,11 @@
 import { Request, Response } from 'express';
 import { Pool } from 'pg';
 import nodemailer from 'nodemailer';
-import * as fs from 'fs';
-import * as path from 'path';
 import * as settingsModel from '../models/settingsModel';
 import { CustomRequest } from '../types/express';
 import { SettingsUpdateInput } from '../types/settings';
 import logger from '../utils/logger';
-import { readEmailConfig } from '../config';
+import { buildEmailConfig } from '../config';
 
 // Get System Settings
 export const getSystemSettings = async (
@@ -57,17 +55,93 @@ export const getAppTheme = async (
   }
 };
 
+const LOG_LEVELS = ['error', 'warn', 'info', 'debug'];
+
+// Fields the admin UI can change that alter how the app behaves at runtime,
+// rather than only how it looks. Kept separate so they can be audit-logged.
+const RUNTIME_KEYS = [
+  'app_base_url',
+  'log_level',
+  'email_enabled',
+  'email_host',
+  'email_port',
+  'email_secure',
+  'sender_email',
+] as const;
+
+function validateSettings(input: SettingsUpdateInput): string | null {
+  const nonEmpty: (keyof SettingsUpdateInput)[] = [
+    'app_name',
+    'company_name',
+    'sender_email',
+    'time_zone',
+    'app_base_url',
+    'email_host',
+  ];
+  for (const key of nonEmpty) {
+    const value = input[key];
+    if (value !== undefined && String(value).trim() === '') {
+      return `${key} cannot be empty`;
+    }
+  }
+  if (input.log_level !== undefined && !LOG_LEVELS.includes(input.log_level)) {
+    return `log_level must be one of: ${LOG_LEVELS.join(', ')}`;
+  }
+  if (input.email_port !== undefined) {
+    const port = Number(input.email_port);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      return 'email_port must be a number between 1 and 65535';
+    }
+  }
+  for (const key of ['email_enabled', 'email_secure'] as const) {
+    if (input[key] !== undefined && typeof input[key] !== 'boolean') {
+      return `${key} must be true or false`;
+    }
+  }
+  if (input.theme !== undefined && !['light', 'dark', 'system'].includes(input.theme)) {
+    return 'theme must be one of: light, dark, system';
+  }
+  return null;
+}
+
 // Update System Settings
 export const updateSystemSettings = async (
-  req: Request,
+  req: CustomRequest,
   res: Response,
   pool: Pool,
 ): Promise<Response | void> => {
   try {
-    const settings = await settingsModel.updateSystemSettings(
-      pool,
-      req.body as SettingsUpdateInput,
+    const input = (req.body ?? {}) as SettingsUpdateInput;
+    const invalid = validateSettings(input);
+    if (invalid) {
+      return res.status(400).json({ error: invalid });
+    }
+
+    const changedRuntimeKeys = RUNTIME_KEYS.filter(
+      (key) => input[key] !== undefined,
     );
+    if (changedRuntimeKeys.length > 0) {
+      const previous = await settingsModel.getSystemSettings(pool);
+      // Changing SMTP or the public base URL over HTTP has a wide blast radius,
+      // so every write leaves a trail naming the actor and the before/after value.
+      logger.warn(
+        {
+          actor: {
+            id: req.session?.user?.id,
+            login: req.session?.user?.login,
+          },
+          ip: req.ip,
+          changes: changedRuntimeKeys.map((key) => ({
+            key,
+            from: previous?.[key] ?? null,
+            to: input[key],
+          })),
+        },
+        'Runtime settings updated',
+      );
+    }
+
+    const settings = await settingsModel.updateSystemSettings(pool, input);
     res.status(200).json(settings);
   } catch (error) {
     logger.error({ err: error });
@@ -117,237 +191,6 @@ export const updateUserSettings = async (
   }
 };
 
-// Allowed env keys to expose. Secrets are masked and not editable.
-const ALLOWED_ENV_KEYS = [
-  'NODE_ENV',
-  'PORT',
-  'FE_URL',
-  'LOG_LEVEL',
-  'EMAIL_ENABLED',
-  'EMAIL_HOST',
-  'EMAIL_PORT',
-  'EMAIL_FROM',
-];
-const EDITABLE_ENV_KEYS = [
-  'PORT',
-  'FE_URL',
-  'LOG_LEVEL',
-  'EMAIL_ENABLED',
-  'EMAIL_HOST',
-  'EMAIL_PORT',
-  'EMAIL_FROM',
-];
-const SECRET_PATTERNS = /PASSWORD|SECRET|KEY|TOKEN|CREDENTIAL/i;
-const LOG_LEVELS = ['error', 'warn', 'info', 'debug'];
-
-function validateEnvValue(
-  key: string,
-  value: string,
-): { valid: boolean; message?: string } {
-  if (value === undefined || value === null) {
-    return { valid: false, message: 'Value is required' };
-  }
-  const v = String(value).trim();
-  switch (key) {
-    case 'PORT': {
-      const num = parseInt(v, 10);
-      if (Number.isNaN(num) || num < 1 || num > 65535) {
-        return {
-          valid: false,
-          message: 'PORT must be a number between 1 and 65535',
-        };
-      }
-      return { valid: true };
-    }
-    case 'LOG_LEVEL':
-      if (!LOG_LEVELS.includes(v.toLowerCase())) {
-        return {
-          valid: false,
-          message: `LOG_LEVEL must be one of: ${LOG_LEVELS.join(', ')}`,
-        };
-      }
-      return { valid: true };
-    case 'EMAIL_PORT': {
-      const num = parseInt(v, 10);
-      if (Number.isNaN(num) || num < 1 || num > 65535) {
-        return {
-          valid: false,
-          message: 'EMAIL_PORT must be a number between 1 and 65535',
-        };
-      }
-      return { valid: true };
-    }
-    case 'EMAIL_ENABLED':
-      if (v !== 'true' && v !== 'false') {
-        return { valid: false, message: 'EMAIL_ENABLED must be true or false' };
-      }
-      return { valid: true };
-    case 'FE_URL':
-    case 'EMAIL_HOST':
-    case 'EMAIL_FROM':
-      if (v.length === 0) {
-        return { valid: false, message: `${key} cannot be empty` };
-      }
-      return { valid: true };
-    default:
-      return { valid: true };
-  }
-}
-
-function getEnvFilePath(): string {
-  return process.env.ENV_FILE_PATH || path.join(process.cwd(), '.env');
-}
-
-// The container filesystem is read-only apart from mounted volumes, so the
-// settings file's directory may not exist on first write.
-function ensureEnvFileDir(filePath: string): void {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-}
-
-function readEnvFile(filePath: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  if (!fs.existsSync(filePath)) return out;
-  const content = fs.readFileSync(filePath, 'utf-8');
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq > 0) {
-      const key = trimmed.slice(0, eq).trim();
-      const value = trimmed
-        .slice(eq + 1)
-        .trim()
-        .replace(/^["']|["']$/g, '');
-      out[key] = value;
-    }
-  }
-  return out;
-}
-
-function formatEnvValue(value: string): string {
-  if (!/[\s#="'\\]/.test(value)) return value;
-  return `"${value
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\r/g, '\\r')
-    .replace(/\n/g, '\\n')}"`;
-}
-
-function writeEnvFile(filePath: string, updates: Record<string, string>): void {
-  const original = fs.existsSync(filePath)
-    ? fs.readFileSync(filePath, 'utf-8')
-    : '';
-  const newline = original.includes('\r\n') ? '\r\n' : '\n';
-  const hadTrailingNewline = /\r?\n$/.test(original);
-  const lines = original ? original.split(/\r?\n/) : [];
-  if (hadTrailingNewline) lines.pop();
-
-  const pending = new Map(Object.entries(updates));
-  const updatedLines = lines.map((line) => {
-    const match = line.match(/^(\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*).*$/);
-    if (!match || !pending.has(match[2])) return line;
-    const value = pending.get(match[2]) ?? '';
-    pending.delete(match[2]);
-    return `${match[1]}${formatEnvValue(value)}`;
-  });
-
-  for (const [key, value] of pending) {
-    updatedLines.push(`${key}=${formatEnvValue(value)}`);
-  }
-
-  ensureEnvFileDir(filePath);
-  fs.writeFileSync(
-    filePath,
-    updatedLines.join(newline) + (updatedLines.length ? newline : ''),
-    'utf-8',
-  );
-}
-
-function buildEnvEntries(filePath: string) {
-  const values = { ...process.env, ...readEnvFile(filePath) };
-  return ALLOWED_ENV_KEYS.map((key) => {
-    const value = values[key];
-    const masked = SECRET_PATTERNS.test(key) || !value;
-    return { key, value: masked ? '****' : (value ?? ''), masked };
-  });
-}
-
-export const getEnvSettings = async (
-  req: Request,
-  res: Response,
-  _pool: Pool,
-): Promise<Response | void> => {
-  try {
-    res.status(200).json(buildEnvEntries(getEnvFilePath()));
-  } catch (error) {
-    logger.error({ err: error });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-export const updateEnvSettings = async (
-  req: CustomRequest,
-  res: Response,
-  _pool: Pool,
-): Promise<Response | void> => {
-  try {
-    const body = req.body as { updates?: Record<string, string> };
-    const updates =
-      body?.updates && typeof body.updates === 'object' ? body.updates : {};
-    const filePath = getEnvFilePath();
-
-    for (const key of Object.keys(updates)) {
-      if (!EDITABLE_ENV_KEYS.includes(key)) {
-        return res.status(400).json({ error: `Key "${key}" is not editable` });
-      }
-      const value = String(updates[key] ?? '').trim();
-      const validation = validateEnvValue(key, value);
-      if (!validation.valid) {
-        return res
-          .status(400)
-          .json({ error: validation.message || 'Invalid value' });
-      }
-    }
-
-    const normalizedUpdates = Object.fromEntries(
-      Object.entries(updates).map(([key, value]) => [key, String(value).trim()]),
-    );
-
-    // Rewriting the process environment over HTTP is a wide blast radius, so
-    // every write leaves a trail naming the actor and the before/after value.
-    const previous = readEnvFile(filePath);
-    logger.warn(
-      {
-        actor: {
-          id: req.session?.user?.id,
-          login: req.session?.user?.login,
-        },
-        ip: req.ip,
-        changes: Object.entries(normalizedUpdates).map(([key, value]) => ({
-          key,
-          from: SECRET_PATTERNS.test(key) ? '****' : (previous[key] ?? null),
-          to: SECRET_PATTERNS.test(key) ? '****' : value,
-        })),
-      },
-      'Environment settings updated',
-    );
-
-    writeEnvFile(filePath, normalizedUpdates);
-
-    res.status(200).json({
-      entries: buildEnvEntries(filePath),
-      restartRequired: true,
-      message: 'Settings saved. Restart the application to apply them.',
-    });
-  } catch (error) {
-    logger.error({ err: error });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
 // Test SMTP Connection
 export const testSmtpConnection = async (
   req: Request,
@@ -373,14 +216,14 @@ export const testSmtpConnection = async (
       });
     }
 
-    const emailConfig = readEmailConfig();
+    const emailConfig = buildEmailConfig(
+      await settingsModel.getSystemSettings(pool),
+    );
 
-    // Check if email is enabled
     if (!emailConfig.enabled) {
       return res.status(400).json({
         success: false,
-        message:
-          'Email sending is disabled. Set EMAIL_ENABLED=true in environment.',
+        message: 'Email sending is disabled. Enable it in System Settings.',
       });
     }
 

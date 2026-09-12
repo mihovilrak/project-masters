@@ -15,6 +15,12 @@ describe('useSystemSettings', () => {
     time_zone: 'UTC',
     theme: 'system',
     welcome_message: 'Welcome to Test App',
+    app_base_url: 'http://localhost:3000',
+    log_level: 'info',
+    email_enabled: false,
+    email_host: 'smtp.example.com',
+    email_port: 587,
+    email_secure: false,
   };
 
   beforeEach(() => {

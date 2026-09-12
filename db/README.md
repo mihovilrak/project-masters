@@ -56,10 +56,23 @@ The tests use the helpers in [setup/db.helpers.ts](../api/src/__tests__/integrat
 
 The `backup` compose service ([backup-scheduler.sh](backup-scheduler.sh)) runs [backup.sh](backup.sh) daily at `BACKUP_TIME` (`HH:MM`, in `TZ`, default `00:00`).
 
-- Dumps go to `./db/backup/db_dump_<timestamp>.sql.gz` on the host. A dump is written to a `.partial` file and only renamed after `gzip -t` passes; dumps older than 30 days are deleted.
-- The service runs as the `postgres` user (uid 70). On Linux, the host directory must be writable by it: `mkdir -p db/backup && sudo chown 70:70 db/backup`.
-- Run a backup now: `docker compose exec backup sh /scripts/backup.sh`.
-- Restore: `gunzip -c db/backup/<file>.sql.gz | docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"`.
+- Dumps go to `./db/backup/db_dump_<timestamp>.dump` on the host, in `pg_dump` custom format (already compressed, restorable selectively and in parallel). A dump is written to a `.partial` file and only renamed after `pg_restore --list` reads it back; dumps older than `BACKUP_RETENTION_DAYS` (default 30) are deleted.
+- The service runs as the `nginx` user (uid 101) from the app image. On Linux, the host directory must be writable by it: `mkdir -p db/backup && sudo chown 101:101 db/backup`.
+- Run a backup now: `docker compose exec backup sh /app/db/backup.sh`.
+- Restore: `docker compose exec -T db pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists < db/backup/<file>.dump`. Add `-j 4` to restore in parallel, or `-t <table>` for a single table.
+- List a dump's contents without restoring: `pg_restore --list db/backup/<file>.dump`.
+
+### Offsite copies
+
+Dumps sit on the same host as the database and are **not encrypted**, so a host loss or a host compromise takes the backups with it. Nothing ships an offsite copy; set one up before treating this as a real backup. A host-side cron job next to the bind mount is enough, for example:
+
+```sh
+# Encrypt, then sync to object storage. Keep the recipient key off this host.
+gpg --encrypt --recipient backups@example.com db/backup/db_dump_*.dump
+aws s3 sync db/backup s3://<bucket>/pm-backups --exclude '*' --include '*.gpg'
+```
+
+Whatever the target, verify a restore into a scratch database periodically; an unread dump is not a backup.
 
 ## Row Level Security (RLS)
 

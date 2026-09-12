@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { compression } from 'vite-plugin-compression2';
 
 // @devexpress/dx-react-scheduler-material-ui@4 ships an ES bundle written
 // against MUI v4/v5 module layouts. These aliases point its internal imports
@@ -16,7 +17,11 @@ const devExpressMuiAliases = [
 ];
 
 export default defineConfig({
-  plugins: [react()],
+  // nginx serves the .gz files with gzip_static instead of compressing per request.
+  plugins: [react(), compression({
+      algorithms: ['gzip'],
+      include: /\.(js|css|html|svg|json)$/,
+    })],
   resolve: { alias: devExpressMuiAliases },
   build: {
     outDir: 'build',

@@ -24,6 +24,12 @@ describe('Settings Profile Integration Tests', () => {
     time_zone: 'UTC',
     theme: 'light',
     welcome_message: 'Welcome to Project Manager',
+    app_base_url: 'http://localhost:3000',
+    log_level: 'info',
+    email_enabled: false,
+    email_host: 'smtp.example.com',
+    email_port: 587,
+    email_secure: false,
     created_on: '2025-01-26',
   };
 

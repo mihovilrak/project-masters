@@ -6,7 +6,10 @@ jest.mock('../../db', () => ({
 
 jest.mock('../../config', () => ({
   config: { appBaseUrl: 'https://app.example.com' },
-  reloadEmailConfig: jest.fn(),
+}));
+
+jest.mock('../../settingsStore', () => ({
+  reloadSettings: jest.fn().mockResolvedValue(false),
 }));
 
 jest.mock('../../services/emailService', () => ({
@@ -33,7 +36,7 @@ jest.mock('../../metrics', () => ({
 
 import { notificationService } from '../../services/notificationService';
 import { pool } from '../../db';
-import { reloadEmailConfig } from '../../config';
+import { reloadSettings } from '../../settingsStore';
 import { emailService } from '../../services/emailService';
 import { metrics } from '../../metrics';
 import { DatabaseNotification } from '../../types/notification-service.types';
@@ -107,7 +110,7 @@ describe('NotificationService', () => {
     });
 
     it('should rebuild the transport when SMTP settings changed', async () => {
-      (reloadEmailConfig as jest.Mock).mockReturnValueOnce(true);
+      (reloadSettings as jest.Mock).mockResolvedValueOnce(true);
       (pool.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 
       await notificationService.processNewNotifications();
@@ -116,7 +119,7 @@ describe('NotificationService', () => {
     });
 
     it('should keep the transport when SMTP settings are unchanged', async () => {
-      (reloadEmailConfig as jest.Mock).mockReturnValueOnce(false);
+      (reloadSettings as jest.Mock).mockResolvedValueOnce(false);
       (pool.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 
       await notificationService.processNewNotifications();

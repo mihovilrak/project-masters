@@ -15,3 +15,12 @@ pgpass_init() {
     "$(pgpass_escape "${POSTGRES_USER}")" \
     "$(pgpass_escape "${POSTGRES_PASSWORD}")" > "$PGPASSFILE"
 }
+
+# Connection settings shared by migrate.sh, seed-admin.sh and backup.sh.
+pg_env_init() {
+  export PGHOST="${POSTGRES_HOST:-db}"
+  export PGPORT="${POSTGRES_PORT:-5432}"
+  export PGUSER="${POSTGRES_USER}"
+  export PGDATABASE="${POSTGRES_DB}"
+  pgpass_init
+}

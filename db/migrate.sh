@@ -12,14 +12,10 @@ INIT_DIR="${INIT_DIR:-$DB_DIR/init}"
 
 . "$DB_DIR/pgpass.sh"
 
-export PGHOST="${POSTGRES_HOST:-db}"
-export PGPORT="${POSTGRES_PORT:-5432}"
-export PGUSER="${POSTGRES_USER}"
-export PGDATABASE="${POSTGRES_DB}"
 # Hides the "already exists, skipping" notices of the idempotent scripts.
 export PGOPTIONS="-c client_min_messages=warning"
 
-pgpass_init
+pg_env_init
 
 run_psql() {
   psql -X -q --no-password -v ON_ERROR_STOP=1 "$@"

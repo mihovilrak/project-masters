@@ -1,5 +1,6 @@
 import { pool } from '../db';
-import { config, reloadEmailConfig } from '../config';
+import { config } from '../config';
+import { reloadSettings } from '../settingsStore';
 import { logger } from '../utils/logger';
 import { emailService } from './emailService';
 import { metrics } from '../metrics';
@@ -32,7 +33,7 @@ class NotificationService {
   async processNewNotifications(): Promise<void> {
     try {
       // SMTP settings are editable from the admin UI while the service runs.
-      if (reloadEmailConfig()) {
+      if (await reloadSettings()) {
         emailService.refreshTransport();
       }
 

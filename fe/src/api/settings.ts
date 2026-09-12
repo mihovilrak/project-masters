@@ -30,7 +30,7 @@ export const getSystemSettings = async (
 
 // Update System Settings
 export const updateSystemSettings = async (
-  settings: AppSettings,
+  settings: Partial<AppSettings>,
 ): Promise<void> => {
   await api.put<void>('/settings/app_settings', settings);
 };
@@ -51,35 +51,6 @@ export const getTimezones = async (
 ): Promise<TimezoneOption[]> => {
   const response = await api.get<TimezoneOption[]>('/settings/timezones', {
     signal,
-  });
-  return response.data;
-};
-
-// Get env settings (Admin only; secrets masked)
-export interface EnvEntry {
-  key: string;
-  value: string;
-  masked: boolean;
-}
-
-export interface EnvUpdateResult {
-  entries: EnvEntry[];
-  restartRequired: boolean;
-  message: string;
-}
-
-export const getEnvSettings = async (
-  signal?: AbortSignal,
-): Promise<EnvEntry[]> => {
-  const response = await api.get<EnvEntry[]>('/settings/env', { signal });
-  return response.data;
-};
-
-export const updateEnvSettings = async (
-  updates: Record<string, string>,
-): Promise<EnvUpdateResult> => {
-  const response = await api.patch<EnvUpdateResult>('/settings/env', {
-    updates,
   });
   return response.data;
 };

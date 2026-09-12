@@ -36,6 +36,7 @@
     "axios": "^1.13.2",
     "dayjs": "^1.11.19",
     "dompurify": "^3.3.1",
+    "material-icons": "^1.13.14",
     "mui-color-input": "^7.0.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
@@ -80,6 +81,7 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.54.0",
     "vite": "^8.2.2",
+    "vite-plugin-compression2": "^2.5.3",
     "web-streams-polyfill": "^4.2.0"
   },
   "browserslist": {

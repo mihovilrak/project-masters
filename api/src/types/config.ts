@@ -1,6 +1,8 @@
+import { DatabaseConfig } from '@pm/backend-common';
+
 export interface Config {
   port: number;
-  databaseUrl: string;
+  database: DatabaseConfig;
   sessionSecret: string;
   feUrl: string;
   nodeEnv: string;

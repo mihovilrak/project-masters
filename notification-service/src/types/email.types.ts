@@ -1,6 +1,8 @@
 import { TemplateDelegate } from 'handlebars';
 import { Transporter } from 'nodemailer';
 
+export type TemplateData = Record<string, unknown>;
+
 export interface EmailTemplates {
   [key: string]: TemplateDelegate;
 }
@@ -14,7 +16,7 @@ export interface MailOptions {
 
 export interface EmailInfo {
   messageId: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface EmailService {
@@ -26,13 +28,13 @@ export interface EmailService {
     to: string,
     subject: string,
     templateName: string,
-    data: any,
+    data: TemplateData,
   ): Promise<EmailInfo | void>;
   sendEmailWithRetry(
     to: string,
     subject: string,
     templateName: string,
-    data: any,
+    data: TemplateData,
     retries?: number,
   ): Promise<EmailInfo | void>;
 }

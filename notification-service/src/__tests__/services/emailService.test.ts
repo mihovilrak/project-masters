@@ -8,13 +8,8 @@ describe('EmailService', () => {
     jest.resetModules();
     process.env = {
       ...originalEnv,
-      EMAIL_HOST: 'smtp.test.com',
-      EMAIL_PORT: '587',
-      EMAIL_SECURE: 'false',
       EMAIL_USER: 'test@test.com',
       EMAIL_PASSWORD: 'testpassword',
-      EMAIL_FROM: 'Test <test@test.com>',
-      EMAIL_ENABLED: 'true',
     };
   });
 
@@ -191,8 +186,7 @@ describe('EmailService', () => {
   });
 
   describe('sendEmail', () => {
-    it('should not send email when EMAIL_ENABLED is false', async () => {
-      process.env.EMAIL_ENABLED = 'false';
+    it('should not send email when email sending is disabled', async () => {
       jest.resetModules();
 
       const { emailService } = await import('../../services/emailService');
@@ -210,7 +204,6 @@ describe('EmailService', () => {
 
   describe('sendEmailWithRetry', () => {
     it('should call sendEmail method', async () => {
-      process.env.EMAIL_ENABLED = 'false';
       jest.resetModules();
 
       const { emailService } = await import('../../services/emailService');
